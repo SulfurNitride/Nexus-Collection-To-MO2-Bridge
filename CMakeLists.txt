@@ -1,0 +1,95 @@
+cmake_minimum_required(VERSION 3.14)
+project(NexusBridge VERSION 2.0)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Find required packages
+find_package(CURL REQUIRED)
+find_package(Threads REQUIRED)
+
+# Fetch FTXUI for TUI
+include(FetchContent)
+FetchContent_Declare(ftxui
+  GIT_REPOSITORY https://github.com/ArthurSonzogni/ftxui
+  GIT_TAG v5.0.0
+)
+FetchContent_GetProperties(ftxui)
+if(NOT ftxui_POPULATED)
+  FetchContent_Populate(ftxui)
+  add_subdirectory(${ftxui_SOURCE_DIR} ${ftxui_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
+
+# Include directories for bundled libraries
+include_directories(${CMAKE_SOURCE_DIR}/include)
+
+# libloot paths
+set(LIBLOOT_DIR "${CMAKE_SOURCE_DIR}/external/libloot/cpp")
+set(LIBLOOT_INCLUDE_DIR "${LIBLOOT_DIR}/include")
+set(LIBLOOT_LIB_DIR "${LIBLOOT_DIR}/build")
+
+# Main executable - new implementation
+add_executable(NexusBridge
+    src/nexus_bridge.cpp
+    src/fomod_installer.cpp
+    include/pugixml/pugixml.cpp
+)
+
+target_include_directories(NexusBridge PRIVATE ${LIBLOOT_INCLUDE_DIR})
+
+target_link_libraries(NexusBridge PRIVATE
+    CURL::libcurl
+    Threads::Threads
+    ${LIBLOOT_LIB_DIR}/libloot.so
+)
+
+# Set rpath so executable can find libloot.so at runtime
+set_target_properties(NexusBridge PROPERTIES
+    BUILD_RPATH "${LIBLOOT_LIB_DIR}"
+    INSTALL_RPATH "${LIBLOOT_LIB_DIR}"
+)
+
+target_compile_options(NexusBridge PRIVATE -Wall -Wextra)
+
+# Legacy executable (old implementation) - for comparison
+add_executable(NexusBridgeLegacy
+    src/main.cpp
+    src/json.cpp
+    src/xml.cpp
+    src/downloader.cpp
+    src/fomod.cpp
+    src/installer.cpp
+    src/api_client.cpp
+)
+
+target_link_libraries(NexusBridgeLegacy PRIVATE
+    CURL::libcurl
+    Threads::Threads
+)
+
+# FOMOD test executable
+add_executable(TestFomod
+    src/test_fomod_new.cpp
+    src/fomod_installer.cpp
+    include/pugixml/pugixml.cpp
+)
+
+target_link_libraries(TestFomod PRIVATE Threads::Threads)
+
+# TUI executable (calls NexusBridge CLI - must be in same directory)
+add_executable(NexusBridgeTUI
+    src/tui_main.cpp
+)
+
+target_link_libraries(NexusBridgeTUI PRIVATE
+    Threads::Threads
+    ftxui::screen
+    ftxui::dom
+    ftxui::component
+)
+
+target_compile_options(NexusBridgeTUI PRIVATE -Wall -Wextra)
+
+# Install targets
+install(TARGETS NexusBridge NexusBridgeTUI DESTINATION bin)

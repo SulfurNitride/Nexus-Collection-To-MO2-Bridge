@@ -1,0 +1,146 @@
+name: Release
+
+on:
+  push:
+    tags: '*.*.*'
+
+env:
+  CARGO_TERM_COLOR: always
+  CMAKE_CONFIG: RelWithDebInfo
+
+jobs:
+  create_release:
+    runs-on: ubuntu-24.04
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Create a draft GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE_TAG="${{ github.ref_name }}"
+          RELEASE_TITLE="libloot v$RELEASE_TAG"
+          RELEASE_NOTES="$(printf "Requires Windows 10 or later, the MSVC 2022 [x86](https://aka.ms/vs/17/release/vc_redist.x86.exe) or [x64](https://aka.ms/vs/17/release/vc_redist.x64.exe) redistributable for 32-bit and 64-bit builds respectively, and [7-Zip](http://www.7-zip.org/) to extract the archives.\n\n## Change Logs\n- [API](https://loot-api.readthedocs.io/en/latest/api/changelog.html)\n- [Metadata Syntax](https://loot-api.readthedocs.io/en/latest/metadata/changelog.html)")"
+
+          gh release create --draft --title "$RELEASE_TITLE" --notes "$RELEASE_NOTES" --verify-tag --repo "${{ github.repository }}" "$RELEASE_TAG"
+
+  windows:
+    runs-on: windows-2022
+    needs: create_release
+
+    permissions:
+      contents: write
+
+    strategy:
+      matrix:
+        target:
+          - i686-pc-windows-msvc
+          - x86_64-pc-windows-msvc
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install Rust i686-pc-windows-msvc target
+        run: rustup target add i686-pc-windows-msvc
+        if: matrix.target == 'i686-pc-windows-msvc'
+
+      - name: Set LIBLOOT_REVISION
+        shell: bash
+        run: echo "LIBLOOT_REVISION=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+
+      - name: Run CMake
+        working-directory: cpp
+        run: |
+          $platform = if ("${{ matrix.target }}" -eq "i686-pc-windows-msvc") { "Win32" } else { "x64" }
+
+          cmake -G "Visual Studio 17 2022" `
+            -A "$platform" `
+            -DCPACK_PACKAGE_VERSION="${{ github.ref_name }}" `
+            -DCPACK_THREADS=0 `
+            -DRUST_TARGET="${{ matrix.target }}" `
+            -B build
+          cmake --build build --parallel --config ${{ env.CMAKE_CONFIG }}
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
+        with:
+          version: "0.8.20"
+
+      - name: Install packages for building docs
+        working-directory: docs
+        run: |
+          curl -sSfLO https://github.com/doxygen/doxygen/releases/download/Release_1_13_2/doxygen-1.13.2.windows.x64.bin.zip
+
+          $hash = Get-FileHash -Algorithm SHA256 doxygen-1.13.2.windows.x64.bin.zip
+          $expectedHash = 'DEDBCF1D05911AFC003989D33194AB95539E2EF4535CC00143B5917C22614406'
+          if ($hash.Hash -ne $expectedHash) {
+            throw 'Unexpected hash: $($hash.Hash)'
+          }
+
+          Expand-Archive doxygen-1.13.2.windows.x64.bin.zip
+
+          echo "${{ github.workspace }}\doxygen-1.13.2.windows.x64.bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+          uv sync --locked
+
+      - name: Build docs
+        working-directory: docs
+        run: uv run --locked -- sphinx-build -b html . build/html
+
+      - name: Build archive
+        id: build-archive
+        shell: bash
+        working-directory: cpp/build
+        run: |
+          cpack -C ${{ env.CMAKE_CONFIG }}
+
+          if [[ "${{ matrix.target }}" == "i686-pc-windows-msvc" ]]
+          then
+            PLATFORM=win32
+          else
+            PLATFORM=win64
+          fi
+
+          echo "filename=libloot-${{ github.ref_name }}-${PLATFORM}.7z" >> "$GITHUB_OUTPUT"
+
+      - name: Upload archive to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload --repo "${{ github.repository }}" "${{ github.ref_name }}" cpp/build/package/${{ steps.build-archive.outputs.filename }}#${{ steps.build-archive.outputs.filename }}
+
+  publish:
+    runs-on: ubuntu-24.04
+
+    environment: release
+
+    permissions:
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: rust-lang/crates-io-auth-action@b7e9a28eded4986ec6b1fa40eeee8f8f165559ec # v1.0.3
+        id: auth
+
+      - run: cargo publish -p libloot
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}

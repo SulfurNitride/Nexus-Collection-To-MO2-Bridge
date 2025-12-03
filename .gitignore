@@ -1,0 +1,14 @@
+# Prerequisites
+build/
+.cache/
+target/
+external/libloot/target/
+external/libloot/cpp/build/
+*.o
+*.so
+*.a
+.vscode/
+.idea/
+*.swp
+.DS_Store
+__pycache__/

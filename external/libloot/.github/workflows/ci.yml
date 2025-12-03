@@ -1,0 +1,455 @@
+name: CI
+
+on:
+  push:
+    # Don't run this workflow when a tag is pushed.
+    branches:
+      - '*'
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: read
+
+jobs:
+  rustfmt:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check formatting
+        run: |
+          cargo fmt -- --version
+          cargo fmt --all -- --check
+
+  clippy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run clippy
+        run: |
+          cargo clippy -- --version
+          cargo clippy --workspace --all-targets -- -Dwarnings
+
+  cargo-vet:
+    runs-on: ubuntu-24.04
+
+    env:
+      CARGO_VET_REV: c178261c96c9f820f67817e9c5458db655ddc21f # 0.10.1
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - uses: actions/cache@v4
+      with:
+        path: ${{ runner.tool_cache }}/cargo-vet
+        key: cargo-vet-bin-${{ env.CARGO_VET_REV }}
+
+    - name: Add the tool cache directory to the search path
+      run: echo "${{ runner.tool_cache }}/cargo-vet/bin" >> $GITHUB_PATH
+
+    - name: Ensure that the tool cache is populated with the cargo-vet binary
+      run: cargo install --root ${{ runner.tool_cache }}/cargo-vet --locked --git https://github.com/mozilla/cargo-vet --rev ${{ env.CARGO_VET_REV }} cargo-vet
+      if: steps.cache-cargo-vet.outputs.cache-hit != 'true'
+
+    - name: Invoke cargo-vet
+      run: |
+        cargo vet --version
+        cargo vet --locked
+
+  rust:
+    strategy:
+      matrix:
+        target:
+          - os: windows-2022
+            triple: i686-pc-windows-msvc
+
+          - os: windows-2022
+            triple: x86_64-pc-windows-msvc
+
+          - os: ubuntu-24.04
+            triple: x86_64-unknown-linux-gnu
+
+    runs-on: ${{ matrix.target.os }}
+
+    env:
+      CARGO_LLVM_COV_VERSION: v0.6.19
+
+    outputs:
+      coverage_windows_x86: ${{ steps.check-coverage.outputs.coverage_i686-pc-windows-msvc }}
+      coverage_windows_x86_64: ${{ steps.check-coverage.outputs.coverage_x86_64-pc-windows-msvc }}
+      coverage_linux_x86_64: ${{ steps.check-coverage.outputs.coverage_x86_64-unknown-linux-gnu }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ github.job }}-${{ runner.os }}-${{ matrix.target.triple }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install Rust i686-pc-windows-msvc target
+        run: rustup target add i686-pc-windows-msvc
+        if: matrix.target.triple == 'i686-pc-windows-msvc'
+
+      - name: Install cargo-llvm-cov
+        shell: bash
+        run: |
+          host=$(rustc -vV | grep '^host:' | cut -d' ' -f2)
+          curl --proto '=https' --tlsv1.2 -fsSLO "https://github.com/taiki-e/cargo-llvm-cov/releases/download/$CARGO_LLVM_COV_VERSION/cargo-llvm-cov-$host.tar.gz"
+
+          if [[ "${{ runner.os }}" == "Windows" ]]
+          then
+            EXPECTED_HASH=dcf8e75e10b07f8348c900a600e429585cccaf4239533b7247a76c7ceaca0b3f
+          else
+            EXPECTED_HASH=aa53c5963beb832f8ea04fea8dcbcece55a99e0c31a8d1e8d514d59ed5942160
+          fi
+
+          sha256sum -c <<< "$EXPECTED_HASH cargo-llvm-cov-$host.tar.gz"
+
+          tar xzf cargo-llvm-cov-$host.tar.gz -C "$HOME/.cargo/bin"
+
+      - name: Prepare test resources
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://github.com/Ortham/testing-plugins/archive/refs/tags/1.6.2.zip -OutFile testing-plugins-1.6.2.zip
+          Expand-Archive testing-plugins-1.6.2.zip .
+          Move-Item testing-plugins-1.6.2 testing-plugins
+          Remove-Item testing-plugins-1.6.2.zip
+
+      - name: Set LIBLOOT_REVISION
+        shell: bash
+        run: echo "LIBLOOT_REVISION=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Build and run tests with code coverage
+        run: cargo llvm-cov --lcov --output-path lcov.info --target ${{ matrix.target.triple }}
+
+      - name: Upload code coverage to Coveralls
+        uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2.3.7
+        if: github.event_name == 'push'
+        continue-on-error: true
+
+      - name: Compress coverage data
+        id: check-coverage
+        shell: bash
+        run: echo "coverage_${{ matrix.target.triple }}=$(cat lcov.info | xz -z | base64 -w 0)" >> $GITHUB_OUTPUT
+
+  cpp:
+    strategy:
+      matrix:
+        target:
+          - os: windows-2022
+            triple: i686-pc-windows-msvc
+
+          - os: windows-2022
+            triple: x86_64-pc-windows-msvc
+
+          - os: ubuntu-24.04
+            triple: x86_64-unknown-linux-gnu
+
+    runs-on: ${{ matrix.target.os }}
+
+    env:
+      CMAKE_CONFIG: RelWithDebInfo
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ github.job }}-${{ runner.os }}-${{ matrix.target.triple }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install Rust i686-pc-windows-msvc target
+        run: rustup target add i686-pc-windows-msvc
+        if: matrix.target.triple == 'i686-pc-windows-msvc'
+
+      - name: Set LIBLOOT_REVISION
+        shell: bash
+        run: echo "LIBLOOT_REVISION=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Get descriptive libloot version
+        id: get-libloot-version
+        shell: bash
+        run: |
+          GIT_DESCRIBE=$(git describe --tags --long --always --abbrev=7)
+          LIBLOOT_DESC_REF=${GIT_DESCRIBE}_${GITHUB_REF#refs/*/}
+          LIBLOOT_SAFE_DESC_REF=${LIBLOOT_DESC_REF//[\/<>\"|]/_}
+          echo "version=$LIBLOOT_SAFE_DESC_REF" >> $GITHUB_OUTPUT
+
+      - name: Build the C++ wrapper (Linux)
+        working-directory: cpp
+        run: |
+          cmake \
+            -DCMAKE_BUILD_TYPE=${{ env.CMAKE_CONFIG }} \
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
+            -DCPACK_PACKAGE_VERSION="${{ steps.get-libloot-version.outputs.version }}" \
+            -DCPACK_THREADS=0 \
+            -DRUST_TARGET="${{ matrix.target.triple }}" \
+            -B build
+          cmake --build build --parallel
+        if: runner.os == 'Linux'
+
+      - name: Build the C++ wrapper (Windows)
+        working-directory: cpp
+        run: |
+          $platform = if ("${{ matrix.target.triple }}" -eq "i686-pc-windows-msvc") { "Win32" } else { "x64" }
+
+          cmake -G "Visual Studio 17 2022" `
+            -A "$platform" `
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=ON `
+            -DCPACK_PACKAGE_VERSION="${{ steps.get-libloot-version.outputs.version }}" `
+            -DCPACK_THREADS=0 `
+            -DRUST_TARGET="${{ matrix.target.triple }}" `
+            -B build
+          cmake --build build --parallel --config ${{ env.CMAKE_CONFIG }}
+        if: runner.os == 'Windows'
+
+      - name: Run the C++ wrapper tests
+        working-directory: cpp
+        run: ctest --test-dir build --build-config ${{ env.CMAKE_CONFIG }} --output-on-failure --parallel
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
+        with:
+          version: "0.8.20"
+
+      - name: Install packages for building docs (Linux)
+        working-directory: docs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-upgrade doxygen
+          uv sync --locked
+        if: runner.os == 'Linux'
+
+      - name: Install packages for building docs (Windows)
+        working-directory: docs
+        run: |
+          curl -sSfLO https://github.com/doxygen/doxygen/releases/download/Release_1_13_2/doxygen-1.13.2.windows.x64.bin.zip
+
+          $hash = Get-FileHash -Algorithm SHA256 doxygen-1.13.2.windows.x64.bin.zip
+          $expectedHash = 'DEDBCF1D05911AFC003989D33194AB95539E2EF4535CC00143B5917C22614406'
+          if ($hash.Hash -ne $expectedHash) {
+            throw 'Unexpected hash: $($hash.Hash)'
+          }
+
+          Expand-Archive doxygen-1.13.2.windows.x64.bin.zip
+
+          echo "${{ github.workspace }}\doxygen-1.13.2.windows.x64.bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+          uv sync --locked
+        if: runner.os == 'Windows'
+
+      - name: Build docs
+        working-directory: docs
+        run: uv run --locked -- sphinx-build -b html . build/html
+
+      - name: Package the C++ wrapper
+        working-directory: cpp/build
+        run: cpack -C ${{ env.CMAKE_CONFIG }}
+
+      - name: Get archive name
+        id: archive-name
+        shell: bash
+        run: |
+          VERSION="${{ steps.get-libloot-version.outputs.version }}"
+
+          if [[ "${{ runner.os }}" == "Windows" ]]
+          then
+            EXTENSION=7z
+            if [[ "${{ matrix.target.triple }}" == "i686-pc-windows-msvc" ]]
+            then
+              PLATFORM=win32
+            else
+              PLATFORM=win64
+            fi
+          else
+            EXTENSION=tar.xz
+            PLATFORM=Linux
+          fi
+
+          echo "filename=libloot-${VERSION}-${PLATFORM}.${EXTENSION}" >> $GITHUB_OUTPUT
+
+      - name: Import GPG key
+        run: echo -n "${{ secrets.GPG_SIGNING_KEY }}" | gpg --import
+        if: github.event_name == 'push'
+
+      - name: Sign archive
+        working-directory: cpp/build/package
+        run: gpg --output "${{ steps.archive-name.outputs.filename }}.sig" --detach-sig "${{ steps.archive-name.outputs.filename }}"
+        if: github.event_name == 'push'
+
+      - name: Upload archive
+        uses: actions/upload-artifact@v5
+        with:
+          name: ${{ steps.archive-name.outputs.filename }}
+          path: |
+            cpp/build/package/${{ steps.archive-name.outputs.filename }}
+            cpp/build/package/${{ steps.archive-name.outputs.filename }}.sig
+        if: github.event_name == 'push'
+
+  python:
+    strategy:
+      matrix:
+        target:
+          - os: ubuntu-24.04
+            triple: x86_64-unknown-linux-gnu
+            architecture: x64
+
+    runs-on: ${{ matrix.target.os }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          architecture: ${{ matrix.target.architecture }}
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ github.job }}-${{ runner.os }}-${{ matrix.target.architecture }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install Rust i686-pc-windows-msvc target
+        run: rustup target add i686-pc-windows-msvc
+        if: matrix.target.triple == 'i686-pc-windows-msvc'
+
+      - name: Set LIBLOOT_REVISION
+        shell: bash
+        run: echo "LIBLOOT_REVISION=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Build the Python wrapper
+        shell: bash
+        working-directory: python
+        run: |
+          python -m venv .venv
+
+          if [[ "${{ runner.os }}" == "Windows" ]]
+          then
+            ./.venv/Scripts/activate
+          else
+            . .venv/bin/activate
+          fi
+
+          pip install maturin
+
+          maturin build --target ${{ matrix.target.triple }} --release
+
+  nodejs:
+    strategy:
+      matrix:
+        target:
+          - os: ubuntu-24.04
+            triple: x86_64-unknown-linux-gnu
+
+    runs-on: ${{ matrix.target.os }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ github.job }}-${{ runner.os }}-${{ matrix.target.triple }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Get npm cache directory
+        id: npm-cache-dir
+        shell: bash
+        run: echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
+        if: startsWith(runner.os, 'Linux')
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.npm-cache-dir.outputs.dir }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install Rust i686-pc-windows-msvc target
+        run: rustup target add i686-pc-windows-msvc
+        if: matrix.target.triple == 'i686-pc-windows-msvc'
+
+      - name: Set LIBLOOT_REVISION
+        shell: bash
+        run: echo "LIBLOOT_REVISION=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Build the Node.js wrapper
+        working-directory: nodejs
+        run: |
+          npm install
+          npm run build
+
+      - name: Run the Node.js wrapper's tests
+        working-directory: nodejs
+        run: npm test
+
+  report-coverage:
+    runs-on: ubuntu-24.04
+
+    needs: rust
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install lcov
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-upgrade lcov
+
+      - name: Merge lcov coverage reports
+        env:
+          coverage_windows_x86: ${{ needs.rust.outputs.coverage_windows_x86 }}
+          coverage_windows_x86_64: ${{ needs.rust.outputs.coverage_windows_x86_64 }}
+          coverage_linux_x86_64: ${{ needs.rust.outputs.coverage_linux_x86_64 }}
+        run: |
+          echo "$coverage_windows_x86" | base64 -d | xz -d > windows_x86.info
+          echo "$coverage_windows_x86_64" | base64 -d | xz -d > windows_x86_64.info
+          echo "$coverage_linux_x86_64" | base64 -d | xz -d > linux_x86_64.info
+
+          lcov -a windows_x86.info -a windows_x86_64.info -a linux_x86_64.info -o merged.info
+
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "$(lcov --summary merged.info)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate HTML coverage report
+        run: |
+          mkdir report
+          genhtml --output-directory=report --substitute "s#.*libloot#$(pwd)#g" --substitute 's#\\#/#g' merged.info
+
+      - name: Upload report
+        uses: actions/upload-artifact@v5
+        with:
+          name: Code coverage report
+          path: report/
+        if: github.event_name == 'push'
