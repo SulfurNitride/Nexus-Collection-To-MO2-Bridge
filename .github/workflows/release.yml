@@ -29,7 +29,7 @@ jobs:
     - name: Build libloot
       run: |
         cd external/libloot
-        cargo build --release --lib
+        cargo build --release -p libloot -p libloot-cpp
 
     - name: Build NexusBridge
       run: |
@@ -80,7 +80,7 @@ jobs:
     - name: Build libloot
       run: |
         cd external/libloot
-        cargo build --release --lib
+        cargo build --release -p libloot -p libloot-cpp
         # Result is in target/release/loot.dll (libloot creates loot.dll on Windows usually)
 
     - name: Build NexusBridge
