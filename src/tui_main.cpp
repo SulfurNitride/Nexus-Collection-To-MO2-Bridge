@@ -19,7 +19,9 @@
 #include <thread>
 #include <vector>
 #include <algorithm>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 #include <limits.h>
 
 namespace fs = std::filesystem;

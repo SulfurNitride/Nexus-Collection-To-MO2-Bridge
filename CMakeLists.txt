@@ -62,6 +62,7 @@ add_executable(NexusBridge
 target_include_directories(NexusBridge PRIVATE 
     ${LIBLOOT_INCLUDE_DIR}
     ${LIBLOOT_CXXBRIDGE_DIR}
+    "${LIBLOOT_DIR}/src"
 )
 
 target_link_libraries(NexusBridge PRIVATE
