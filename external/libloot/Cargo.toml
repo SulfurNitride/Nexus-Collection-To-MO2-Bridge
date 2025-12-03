@@ -35,7 +35,7 @@ debug = "limited"
 lto = "thin"
 
 [workspace]
-members = ["cpp", "ffi-errors", "nodejs", "array-parameterized-test", "python"]
+members = ["cpp", "ffi-errors", "array-parameterized-test"]
 
 [workspace.package]
 version = "0.28.3"
