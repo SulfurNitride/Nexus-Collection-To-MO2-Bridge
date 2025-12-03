@@ -30,6 +30,8 @@ jobs:
       run: |
         cd external/libloot
         cargo build --release -p libloot -p libloot-cpp
+        # Debug: Find cxx.cc
+        find target -name "cxx.cc"
 
     - name: Build NexusBridge
       run: |

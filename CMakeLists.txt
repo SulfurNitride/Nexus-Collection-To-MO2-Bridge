@@ -40,16 +40,25 @@ set(LIBLOOT_BRIDGE_SOURCE "${LIBLOOT_CXXBRIDGE_DIR}/libloot-cpp/src/lib.rs.cc")
 file(GLOB_RECURSE LIBLOOT_CXX_SUPPORT_SOURCE "${LIBLOOT_CXXBRIDGE_DIR}/rust/*.cc")
 
 if(WIN32)
-    # Windows expects .lib for linking (import library)
+    # Windows
     set(LIBLOOT_LIB_DIR "${CMAKE_SOURCE_DIR}/external/libloot/target/release")
     find_library(LIBLOOT_LIB NAMES loot loot.dll libloot libloot.dll PATHS ${LIBLOOT_LIB_DIR} NO_DEFAULT_PATH)
+    # Also find libloot-cpp static lib for cxx symbols
+    find_library(LIBLOOT_CPP_LIB NAMES loot_cpp libloot_cpp PATHS ${LIBLOOT_LIB_DIR} NO_DEFAULT_PATH)
 else()
-    # Linux expects .so
+    # Linux
     set(LIBLOOT_LIB_DIR "${CMAKE_SOURCE_DIR}/external/libloot/target/release")
     find_library(LIBLOOT_LIB NAMES loot libloot PATHS ${LIBLOOT_LIB_DIR} NO_DEFAULT_PATH)
     if(NOT LIBLOOT_LIB)
         message(WARNING "Could not find libloot.so in ${LIBLOOT_LIB_DIR}, falling back to hardcoded path")
         set(LIBLOOT_LIB "${LIBLOOT_LIB_DIR}/libloot.so")
+    endif()
+    
+    # Find libloot-cpp static lib (likely liblibloot_cpp.a)
+    find_library(LIBLOOT_CPP_LIB NAMES libloot_cpp PATHS ${LIBLOOT_LIB_DIR} NO_DEFAULT_PATH)
+    if(NOT LIBLOOT_CPP_LIB)
+         # Try with lib prefix explicitly if not found (cmake usually handles this but just in case)
+         set(LIBLOOT_CPP_LIB "${LIBLOOT_LIB_DIR}/liblibloot_cpp.a")
     endif()
 endif()
 
@@ -73,6 +82,7 @@ target_link_libraries(NexusBridge PRIVATE
     CURL::libcurl
     Threads::Threads
     ${LIBLOOT_LIB}
+    ${LIBLOOT_CPP_LIB}
 )
 
 # Set rpath so executable can find libloot.so at runtime
