@@ -11,6 +11,7 @@ find_package(Threads REQUIRED)
 
 # Fetch FTXUI for TUI
 include(FetchContent)
+cmake_policy(SET CMP0169 OLD) # Suppress FetchContent_Populate deprecation warning
 FetchContent_Declare(ftxui
   GIT_REPOSITORY https://github.com/ArthurSonzogni/ftxui
   GIT_TAG v5.0.0
@@ -30,14 +31,17 @@ set(LIBLOOT_INCLUDE_DIR "${LIBLOOT_DIR}/include")
 
 if(WIN32)
     # Windows expects .lib for linking (import library)
-    # Cargo produces 'loot.dll.lib' or 'loot.lib' depending on configuration
-    # We'll look for it in target/release
     set(LIBLOOT_LIB_DIR "${CMAKE_SOURCE_DIR}/external/libloot/target/release")
     find_library(LIBLOOT_LIB NAMES loot loot.dll libloot libloot.dll PATHS ${LIBLOOT_LIB_DIR} NO_DEFAULT_PATH)
 else()
     # Linux expects .so
+    # We use find_library to locate it if the exact name varies (libloot.so vs liblibloot.so)
     set(LIBLOOT_LIB_DIR "${CMAKE_SOURCE_DIR}/external/libloot/target/release")
-    set(LIBLOOT_LIB "${LIBLOOT_LIB_DIR}/libloot.so")
+    find_library(LIBLOOT_LIB NAMES loot libloot PATHS ${LIBLOOT_LIB_DIR} NO_DEFAULT_PATH)
+    if(NOT LIBLOOT_LIB)
+        message(WARNING "Could not find libloot.so in ${LIBLOOT_LIB_DIR}, falling back to hardcoded path")
+        set(LIBLOOT_LIB "${LIBLOOT_LIB_DIR}/libloot.so")
+    endif()
 endif()
 
 # Main executable - new implementation
@@ -63,7 +67,11 @@ if(UNIX)
     )
 endif()
 
-target_compile_options(NexusBridge PRIVATE -Wall -Wextra)
+if(MSVC)
+    target_compile_options(NexusBridge PRIVATE /W4 /wd4996 /wd4101) # Disable fopen warnings
+else()
+    target_compile_options(NexusBridge PRIVATE -Wall -Wextra)
+endif()
 
 # Legacy executable (old implementation) - for comparison
 add_executable(NexusBridgeLegacy
@@ -102,7 +110,11 @@ target_link_libraries(NexusBridgeTUI PRIVATE
     ftxui::component
 )
 
-target_compile_options(NexusBridgeTUI PRIVATE -Wall -Wextra)
+if(MSVC)
+    target_compile_options(NexusBridgeTUI PRIVATE /W4)
+else()
+    target_compile_options(NexusBridgeTUI PRIVATE -Wall -Wextra)
+endif()
 
 # Install targets
 install(TARGETS NexusBridge NexusBridgeTUI DESTINATION bin)

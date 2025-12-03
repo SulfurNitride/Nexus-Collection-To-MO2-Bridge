@@ -30,14 +30,10 @@ jobs:
       run: |
         cd external/libloot
         cargo build --release --lib
-        # Debug: List generated files to find the correct library name
-        ls -l target/release/
-        # Handle potential naming variations (libloot.so vs liblibloot.so)
-        mkdir -p ../../build
-        find target/release -name "libloot.so" -exec cp {} ../../build/ \; -o -name "liblibloot.so" -exec cp {} ../../build/ \;
 
     - name: Build NexusBridge
       run: |
+        mkdir build
         cd build
         cmake -DCMAKE_BUILD_TYPE=Release ..
         make
@@ -52,8 +48,8 @@ jobs:
       run: |
         mkdir dist
         cp build/NexusBridge dist/
-        # Copy the library we found earlier
-        cp build/*.so dist/libloot.so
+        # Find and copy libloot (it might be named libloot.so or liblibloot.so)
+        find external/libloot/target/release -name "lib*loot.so" -exec cp {} dist/libloot.so \;
         cp 7zzs dist/
         tar -czf NexusBridge-Linux-x64.tar.gz -C dist .
 
