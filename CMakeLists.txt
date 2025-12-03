@@ -27,7 +27,18 @@ include_directories(${CMAKE_SOURCE_DIR}/include)
 # libloot paths
 set(LIBLOOT_DIR "${CMAKE_SOURCE_DIR}/external/libloot/cpp")
 set(LIBLOOT_INCLUDE_DIR "${LIBLOOT_DIR}/include")
-set(LIBLOOT_LIB_DIR "${LIBLOOT_DIR}/build")
+
+if(WIN32)
+    # Windows expects .lib for linking (import library)
+    # Cargo produces 'loot.dll.lib' or 'loot.lib' depending on configuration
+    # We'll look for it in target/release
+    set(LIBLOOT_LIB_DIR "${CMAKE_SOURCE_DIR}/external/libloot/target/release")
+    find_library(LIBLOOT_LIB NAMES loot loot.dll libloot libloot.dll PATHS ${LIBLOOT_LIB_DIR} NO_DEFAULT_PATH)
+else()
+    # Linux expects .so
+    set(LIBLOOT_LIB_DIR "${CMAKE_SOURCE_DIR}/external/libloot/target/release")
+    set(LIBLOOT_LIB "${LIBLOOT_LIB_DIR}/libloot.so")
+endif()
 
 # Main executable - new implementation
 add_executable(NexusBridge
@@ -41,14 +52,16 @@ target_include_directories(NexusBridge PRIVATE ${LIBLOOT_INCLUDE_DIR})
 target_link_libraries(NexusBridge PRIVATE
     CURL::libcurl
     Threads::Threads
-    ${LIBLOOT_LIB_DIR}/libloot.so
+    ${LIBLOOT_LIB}
 )
 
 # Set rpath so executable can find libloot.so at runtime
-set_target_properties(NexusBridge PROPERTIES
-    BUILD_RPATH "${LIBLOOT_LIB_DIR}"
-    INSTALL_RPATH "${LIBLOOT_LIB_DIR}"
-)
+if(UNIX)
+    set_target_properties(NexusBridge PROPERTIES
+        BUILD_RPATH "${LIBLOOT_LIB_DIR}"
+        INSTALL_RPATH "${LIBLOOT_LIB_DIR}"
+    )
+endif()
 
 target_compile_options(NexusBridge PRIVATE -Wall -Wextra)
 

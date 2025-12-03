@@ -105,6 +105,9 @@ std::string loadApiKey(const std::string &argKey) {
     return trim(readFile("nexus_apikey.txt"));
   // Check TUI config directory
   const char* home = std::getenv("HOME");
+#ifdef _WIN32
+  if (!home) home = std::getenv("USERPROFILE");
+#endif
   if (home) {
     std::string configKey = std::string(home) + "/.config/nexusbridge/apikey.txt";
     if (fs::exists(configKey))
