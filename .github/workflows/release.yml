@@ -22,23 +22,22 @@ jobs:
         sudo apt-get install -y libcurl4-openssl-dev libpugixml-dev cmake build-essential
 
     - name: Install Rust (for libloot)
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@master
       with:
         toolchain: stable
-        profile: minimal
-        override: true
 
     - name: Build libloot
       run: |
         cd external/libloot
         cargo build --release --lib
-        # Copy .so to a known location for cmake to find or for packaging
-        mkdir -p build
-        cp target/release/libloot.so build/
+        # Debug: List generated files to find the correct library name
+        ls -l target/release/
+        # Handle potential naming variations (libloot.so vs liblibloot.so)
+        mkdir -p ../../build
+        find target/release -name "libloot.so" -exec cp {} ../../build/ \; -o -name "liblibloot.so" -exec cp {} ../../build/ \;
 
     - name: Build NexusBridge
       run: |
-        mkdir build
         cd build
         cmake -DCMAKE_BUILD_TYPE=Release ..
         make
@@ -53,7 +52,8 @@ jobs:
       run: |
         mkdir dist
         cp build/NexusBridge dist/
-        cp external/libloot/target/release/libloot.so dist/
+        # Copy the library we found earlier
+        cp build/*.so dist/libloot.so
         cp 7zzs dist/
         tar -czf NexusBridge-Linux-x64.tar.gz -C dist .
 
@@ -71,11 +71,9 @@ jobs:
         submodules: recursive
 
     - name: Install Rust (for libloot)
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@master
       with:
         toolchain: stable
-        profile: minimal
-        override: true
 
     - name: Install Dependencies (vcpkg)
       run: |
