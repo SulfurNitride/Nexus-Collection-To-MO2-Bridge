@@ -19,7 +19,7 @@ public:
             #ifndef _WIN32
                 // Ensure it's executable on Linux
                 std::string chmod = "chmod +x " + bundled;
-                std::system(chmod.c_str());
+                (void)std::system(chmod.c_str());
             #endif
             return bundled;
         }

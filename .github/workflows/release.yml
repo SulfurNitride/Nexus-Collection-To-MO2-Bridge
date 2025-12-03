@@ -50,6 +50,7 @@ jobs:
       run: |
         mkdir dist
         cp build/NexusBridge dist/
+        cp build/NexusBridgeTUI dist/
         # Find and copy libloot (it might be named libloot.so or liblibloot.so)
         find external/libloot/target/release -name "lib*loot.so" -exec cp {} dist/libloot.so \;
         cp 7zzs dist/
@@ -102,6 +103,7 @@ jobs:
       run: |
         mkdir dist
         copy build\Release\NexusBridge.exe dist\
+        copy build\Release\NexusBridgeTUI.exe dist\
         copy external\libloot\target\release\loot.dll dist\libloot.dll
         copy 7za.exe dist\
         # We might need libcurl.dll depending on vcpkg linkage, usually vcpkg handles it or we static link

@@ -1,8 +1,7 @@
-#pragma once
 #include "console.h"
+#include "json.h"
 #include <string>
-#include <curl/curl.h>
-#include <iostream>
+#include <vector>
 
 class ApiClient {
 public:
