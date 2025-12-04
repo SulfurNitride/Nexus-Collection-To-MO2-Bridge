@@ -2,6 +2,7 @@
 #include "json.h"
 #include <string>
 #include <vector>
+#include <curl/curl.h>
 
 class ApiClient {
 public:
