@@ -19,10 +19,20 @@
 #include <thread>
 #include <vector>
 #include <algorithm>
-#ifndef _WIN32
-#include <unistd.h>
-#endif
 #include <limits.h>
+
+#ifdef _WIN32
+    #include <windows.h>
+    #include <io.h>
+    #define PATH_MAX MAX_PATH
+    #define popen _popen
+    #define pclose _pclose
+    #ifndef S_ISDIR
+        #define S_ISDIR(mode) (((mode) & S_IFMT) == S_IFDIR)
+    #endif
+#else
+    #include <unistd.h>
+#endif
 
 namespace fs = std::filesystem;
 using namespace ftxui;
@@ -33,6 +43,14 @@ std::string getExecutableDir() {
   if (!dir.empty()) return dir;
 
   char buf[PATH_MAX];
+#ifdef _WIN32
+  DWORD len = GetModuleFileNameA(NULL, buf, PATH_MAX);
+  if (len > 0) {
+    fs::path p(buf);
+    dir = p.parent_path().string();
+    return dir;
+  }
+#else
   ssize_t len = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
   if (len != -1) {
     buf[len] = '\0';
@@ -40,6 +58,7 @@ std::string getExecutableDir() {
     dir = p.parent_path().string();
     return dir;
   }
+#endif
 
   dir = fs::current_path().string();
   return dir;
