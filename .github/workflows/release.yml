@@ -104,7 +104,24 @@ jobs:
         mkdir dist
         copy build\Release\NexusBridge.exe dist\
         copy build\Release\NexusBridgeTUI.exe dist\
-        if (Test-Path external\libloot\target\release\loot.dll) { copy external\libloot\target\release\loot.dll dist\libloot.dll } elseif (Test-Path external\libloot\target\release\libloot.dll) { copy external\libloot\target\release\libloot.dll dist\libloot.dll } else { Write-Error "Could not find loot.dll or libloot.dll" }
+        
+        # Find loot.dll recursively
+        $loot = Get-ChildItem -Path external\libloot\target -Recurse -Include "loot.dll","libloot.dll" | Select-Object -First 1
+        if ($loot) { 
+            Write-Host "Found libloot: $($loot.FullName)"
+            copy $loot.FullName dist\libloot.dll 
+        } else { 
+            Write-Error "Could not find loot.dll or libloot.dll" 
+        }
+
+        # Try to copy vcpkg dependencies (libcurl, zlib)
+        # Default location on GitHub Actions windows runner
+        $vcpkgBin = "C:\vcpkg\installed\x64-windows\bin"
+        if (Test-Path $vcpkgBin) {
+            copy "$vcpkgBin\libcurl.dll" dist\ -ErrorAction SilentlyContinue
+            copy "$vcpkgBin\zlib1.dll" dist\ -ErrorAction SilentlyContinue
+        }
+        
         copy 7za.exe dist\
         # We might need libcurl.dll depending on vcpkg linkage, usually vcpkg handles it or we static link
         # For safety, we'll try to find and copy it if it exists, or rely on static linking
