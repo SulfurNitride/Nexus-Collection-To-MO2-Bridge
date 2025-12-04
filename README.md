@@ -2,6 +2,8 @@
 
 A lightweight, standalone bridge tool to install Nexus Collections directly into Mod Organizer 2 (MO2), bypassing Vortex completely.
 
+# [DISCORD](https://discord.gg/9JWQzSeUWt)
+
 ## Features
 *   **Direct Installation:** Installs collections directly to your MO2 `mods` folder.
 *   **Zero Dependencies:** Bundles everything you need (including 7-Zip and Loot). No need to install Python, Node.js, or other runtimes.
