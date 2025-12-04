@@ -22,6 +22,7 @@
 #include <limits.h>
 
 #ifdef _WIN32
+    #define NOMINMAX
     #include <windows.h>
     #include <io.h>
     #define PATH_MAX MAX_PATH
