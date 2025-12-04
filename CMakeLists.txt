@@ -25,6 +25,11 @@ endif()
 # Include directories for bundled libraries
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
+# Global definitions for Windows
+if(WIN32)
+    add_compile_definitions(NOMINMAX LOOT_STATIC)
+endif()
+
 # libloot paths
 set(LIBLOOT_DIR "${CMAKE_SOURCE_DIR}/external/libloot/cpp")
 set(LIBLOOT_INCLUDE_DIR "${LIBLOOT_DIR}/include")
