@@ -104,7 +104,7 @@ jobs:
         mkdir dist
         copy build\Release\NexusBridge.exe dist\
         copy build\Release\NexusBridgeTUI.exe dist\
-        copy external\libloot\target\release\loot.dll dist\libloot.dll
+        if (Test-Path external\libloot\target\release\loot.dll) { copy external\libloot\target\release\loot.dll dist\libloot.dll } elseif (Test-Path external\libloot\target\release\libloot.dll) { copy external\libloot\target\release\libloot.dll dist\libloot.dll } else { Write-Error "Could not find loot.dll or libloot.dll" }
         copy 7za.exe dist\
         # We might need libcurl.dll depending on vcpkg linkage, usually vcpkg handles it or we static link
         # For safety, we'll try to find and copy it if it exists, or rely on static linking
