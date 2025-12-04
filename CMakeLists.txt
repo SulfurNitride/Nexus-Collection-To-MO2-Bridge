@@ -90,6 +90,10 @@ target_link_libraries(NexusBridge PRIVATE
     ${LIBLOOT_CPP_LIB}
 )
 
+if(WIN32)
+    target_link_libraries(NexusBridge PRIVATE ntdll ws2_32 bcrypt Userenv Advapi32)
+endif()
+
 # Set rpath so executable can find libloot.so at runtime
 if(UNIX)
     set_target_properties(NexusBridge PROPERTIES
