@@ -660,13 +660,14 @@ bool extractArchive(const std::string &archivePath,
   std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
 
   std::string cmd;
+  std::string sevenZip = get7zCommand();
   if (ext == ".7z" || ext == ".zip" || ext == ".rar") {
     // Use 7z for all supported formats
 #ifdef _WIN32
-    cmd = "\"" + get7zCommand() + "\" x -y -o\"" + destPath + "\" \"" + archivePath +
-          "\" > NUL 2>&1";
+    // Windows cmd.exe needs outer quotes when inner quotes are present
+    cmd = "\"\"" + sevenZip + "\" x -y -o\"" + destPath + "\" \"" + archivePath + "\"\"";
 #else
-    cmd = get7zCommand() + " x -y -o\"" + destPath + "\" \"" + archivePath +
+    cmd = sevenZip + " x -y -o\"" + destPath + "\" \"" + archivePath +
           "\" > /dev/null 2>&1";
 #endif
   } else {
