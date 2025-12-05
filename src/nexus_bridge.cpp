@@ -52,6 +52,22 @@ std::string readFile(const std::string &path) {
   return buffer.str();
 }
 
+// Get cross-platform temp directory
+fs::path getTempDir() {
+#ifdef _WIN32
+  const char* temp = std::getenv("TEMP");
+  if (temp) return fs::path(temp);
+  temp = std::getenv("TMP");
+  if (temp) return fs::path(temp);
+  // Fallback to current directory
+  return fs::current_path();
+#else
+  const char* temp = std::getenv("TMPDIR");
+  if (temp) return fs::path(temp);
+  return fs::path("/tmp");
+#endif
+}
+
 std::string trim(const std::string &str) {
   size_t first = str.find_first_not_of(" \t\n\r");
   if (std::string::npos == first)
@@ -594,8 +610,13 @@ bool extractArchive(const std::string &archivePath,
   std::string cmd;
   if (ext == ".7z" || ext == ".zip" || ext == ".rar") {
     // Use 7z for all supported formats
+#ifdef _WIN32
+    cmd = "\"" + get7zCommand() + "\" x -y -o\"" + destPath + "\" \"" + archivePath +
+          "\" > NUL 2>&1";
+#else
     cmd = get7zCommand() + " x -y -o\"" + destPath + "\" \"" + archivePath +
           "\" > /dev/null 2>&1";
+#endif
   } else {
     std::cerr << "  Unsupported archive format: " << ext << std::endl;
     return false;
@@ -2052,7 +2073,7 @@ std::string fetchCollectionFromNexus(const std::string &game,
     std::cout << "  Downloading collection archive..." << std::endl;
 
     // Download the .7z archive to a temp file
-    std::string archivePath = "/tmp/nexusbridge_collection_" + slug + ".7z";
+    fs::path archivePath = getTempDir() / ("nexusbridge_collection_" + slug + ".7z");
 
     CURL *curl = curl_easy_init();
     if (!curl) {
@@ -2060,7 +2081,7 @@ std::string fetchCollectionFromNexus(const std::string &game,
       return "";
     }
 
-    FILE *archiveFile = fopen(archivePath.c_str(), "wb");
+    FILE *archiveFile = fopen(archivePath.string().c_str(), "wb");
     if (!archiveFile) {
       std::cerr << "Failed to create archive file" << std::endl;
       curl_easy_cleanup(curl);
@@ -2079,38 +2100,41 @@ std::string fetchCollectionFromNexus(const std::string &game,
 
     if (res != CURLE_OK) {
       std::cerr << "Failed to download archive: " << curl_easy_strerror(res) << std::endl;
-      std::remove(archivePath.c_str());
+      std::remove(archivePath.string().c_str());
       return "";
     }
 
     std::cout << "  Extracting collection.json..." << std::endl;
 
     // Extract collection.json from the .7z archive using 7za
-    std::string extractDir = "/tmp/nexusbridge_collection_" + slug;
-    // Extract collection.json from the .7z archive using 7za
-    std::string extractCmd =
-        "mkdir -p " + extractDir +
-        " && " + get7zCommand() + " x -o" + extractDir + " " + archivePath + " collection.json -y > /dev/null 2>&1";
+    fs::path extractDir = getTempDir() / ("nexusbridge_collection_" + slug);
+    fs::create_directories(extractDir);
+
+#ifdef _WIN32
+    std::string extractCmd = "\"" + get7zCommand() + "\" x -o\"" + extractDir.string() + "\" \"" + archivePath.string() + "\" collection.json -y > NUL 2>&1";
+#else
+    std::string extractCmd = get7zCommand() + " x -o" + extractDir.string() + " " + archivePath.string() + " collection.json -y > /dev/null 2>&1";
+#endif
     int extractResult = std::system(extractCmd.c_str());
 
     if (extractResult != 0) {
       std::cerr << "Failed to extract collection.json from archive" << std::endl;
-      std::remove(archivePath.c_str());
+      std::remove(archivePath.string().c_str());
       return "";
     }
 
-    std::string collectionJsonPath = extractDir + "/collection.json";
+    fs::path collectionJsonPath = extractDir / "collection.json";
     if (!std::filesystem::exists(collectionJsonPath)) {
       std::cerr << "collection.json not found in archive" << std::endl;
-      std::remove(archivePath.c_str());
+      std::remove(archivePath.string().c_str());
       return "";
     }
 
     // Clean up archive
-    std::remove(archivePath.c_str());
+    std::remove(archivePath.string().c_str());
 
-    std::cout << "  Extracted to: " << collectionJsonPath << std::endl;
-    return collectionJsonPath;
+    std::cout << "  Extracted to: " << collectionJsonPath.string() << std::endl;
+    return collectionJsonPath.string();
 
   } catch (const std::exception &e) {
     std::cerr << "Error parsing GraphQL response: " << e.what() << std::endl;
