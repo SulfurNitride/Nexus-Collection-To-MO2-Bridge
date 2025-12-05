@@ -2162,15 +2162,23 @@ std::string fetchCollectionFromNexus(const std::string &game,
     fs::path extractDir = getTempDir() / ("nexusbridge_collection_" + slug);
     fs::create_directories(extractDir);
 
+    std::string sevenZip = get7zCommand();
+    std::cout << "  Using 7z: " << sevenZip << std::endl;
+    std::cout << "  Archive: " << archivePath.string() << std::endl;
+    std::cout << "  Extract to: " << extractDir.string() << std::endl;
+
 #ifdef _WIN32
-    std::string extractCmd = "\"" + get7zCommand() + "\" x -o\"" + extractDir.string() + "\" \"" + archivePath.string() + "\" collection.json -y > NUL 2>&1";
+    // Windows: need to be careful with quoting for cmd.exe
+    std::string extractCmd = "\"\"" + sevenZip + "\" x -o\"" + extractDir.string() + "\" \"" + archivePath.string() + "\" collection.json -y\"";
 #else
-    std::string extractCmd = get7zCommand() + " x -o" + extractDir.string() + " " + archivePath.string() + " collection.json -y > /dev/null 2>&1";
+    std::string extractCmd = sevenZip + " x -o" + extractDir.string() + " " + archivePath.string() + " collection.json -y > /dev/null 2>&1";
 #endif
+    std::cout << "  Command: " << extractCmd << std::endl;
     int extractResult = std::system(extractCmd.c_str());
+    std::cout << "  Result: " << extractResult << std::endl;
 
     if (extractResult != 0) {
-      std::cerr << "Failed to extract collection.json from archive" << std::endl;
+      std::cerr << "Failed to extract collection.json from archive (exit code: " << extractResult << ")" << std::endl;
       std::remove(archivePath.string().c_str());
       return "";
     }
