@@ -65,17 +65,68 @@ std::string getExecutableDir() {
   return dir;
 }
 
+// Get user's home directory (cross-platform)
+fs::path getHomeDir() {
+#ifdef _WIN32
+  const char* userProfile = getenv("USERPROFILE");
+  if (userProfile) {
+    return fs::path(userProfile);
+  }
+  // Fallback to HOMEDRIVE + HOMEPATH
+  const char* homeDrive = getenv("HOMEDRIVE");
+  const char* homePath = getenv("HOMEPATH");
+  if (homeDrive && homePath) {
+    return fs::path(std::string(homeDrive) + homePath);
+  }
+#else
+  const char* home = getenv("HOME");
+  if (home) {
+    return fs::path(home);
+  }
+#endif
+  return fs::current_path();
+}
+
+// Get config directory (cross-platform)
+fs::path getConfigDir() {
+#ifdef _WIN32
+  const char* appData = getenv("APPDATA");
+  if (appData) {
+    return fs::path(appData) / "NexusBridge";
+  }
+  return getHomeDir() / "NexusBridge";
+#else
+  return getHomeDir() / ".config" / "nexusbridge";
+#endif
+}
+
+// Get default MO2 path (cross-platform)
+fs::path getDefaultMO2Path() {
+#ifdef _WIN32
+  return getHomeDir() / "Documents" / "MO2";
+#else
+  return getHomeDir() / "Documents" / "MO2";
+#endif
+}
+
 // Find NexusBridge executable (same directory as TUI)
 std::string findNexusBridge() {
-  std::string exeDir = getExecutableDir();
-  std::string sameDirPath = exeDir + "/NexusBridge";
+  fs::path exeDir = getExecutableDir();
+#ifdef _WIN32
+  fs::path exeName = "NexusBridge.exe";
+#else
+  fs::path exeName = "NexusBridge";
+#endif
+
+  fs::path sameDirPath = exeDir / exeName;
   if (fs::exists(sameDirPath)) {
-    return sameDirPath;
+    return sameDirPath.string();
   }
 
   // Fallback: try current directory
-  if (fs::exists("./NexusBridge")) {
-    return "./NexusBridge";
+  fs::path cwdPath = fs::current_path() / exeName;
+  if (fs::exists(cwdPath)) {
+    return cwdPath.string();
   }
 
   return "";
@@ -216,18 +267,18 @@ struct AppState {
 
 // Load settings from file
 void loadSettings(AppState& state) {
-  std::string configDir = std::string(getenv("HOME") ? getenv("HOME") : ".") + "/.config/nexusbridge";
+  fs::path configDir = getConfigDir();
   fs::create_directories(configDir);
 
   // Load API key
-  std::string keyFile = configDir + "/apikey.txt";
+  fs::path keyFile = configDir / "apikey.txt";
   if (fs::exists(keyFile)) {
     std::ifstream f(keyFile);
     std::getline(f, state.apiKey);
   }
 
   // Load MO2 path
-  std::string pathFile = configDir + "/mo2path.txt";
+  fs::path pathFile = configDir / "mo2path.txt";
   if (fs::exists(pathFile)) {
     std::ifstream f(pathFile);
     std::getline(f, state.mo2Path);
@@ -235,19 +286,19 @@ void loadSettings(AppState& state) {
 
   // Default MO2 path
   if (state.mo2Path.empty()) {
-    state.mo2Path = std::string(getenv("HOME") ? getenv("HOME") : ".") + "/Documents/MO2";
+    state.mo2Path = getDefaultMO2Path().string();
   }
 }
 
 // Save settings to file
 void saveSettings(const AppState& state) {
-  std::string configDir = std::string(getenv("HOME") ? getenv("HOME") : ".") + "/.config/nexusbridge";
+  fs::path configDir = getConfigDir();
   fs::create_directories(configDir);
 
-  std::ofstream keyFile(configDir + "/apikey.txt");
+  std::ofstream keyFile(configDir / "apikey.txt");
   keyFile << state.apiKey;
 
-  std::ofstream pathFile(configDir + "/mo2path.txt");
+  std::ofstream pathFile(configDir / "mo2path.txt");
   pathFile << state.mo2Path;
 }
 
@@ -259,8 +310,9 @@ std::vector<std::string> getPathCompletions(const std::string& partial) {
   fs::path parent = path.parent_path();
   std::string prefix = path.filename().string();
 
-  // If partial ends with /, list that directory
-  if (partial.back() == '/') {
+  // If partial ends with a path separator, list that directory
+  char lastChar = partial.back();
+  if (lastChar == '/' || lastChar == '\\') {
     parent = path;
     prefix = "";
   }
@@ -274,7 +326,7 @@ std::vector<std::string> getPathCompletions(const std::string& partial) {
         if (name.find(prefix) == 0) {
           std::string full = entry.path().string();
           if (entry.is_directory()) {
-            full += "/";
+            full += fs::path::preferred_separator;
           }
           completions.push_back(full);
         }
