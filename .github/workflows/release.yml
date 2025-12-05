@@ -2,6 +2,8 @@ name: Build and Release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
 
@@ -139,6 +141,7 @@ jobs:
   release:
     needs: [build-linux, build-windows]
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
     steps:
     - uses: actions/download-artifact@v4
       with:
