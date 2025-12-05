@@ -33,6 +33,14 @@
 #include <thread>
 #include <vector>
 
+#ifdef _WIN32
+  #define NOMINMAX
+  #include <windows.h>
+#else
+  #include <unistd.h>
+  #include <climits>
+#endif
+
 // libloot for plugin sorting
 #include <loot/api.h>
 
@@ -50,6 +58,31 @@ std::string readFile(const std::string &path) {
   std::stringstream buffer;
   buffer << t.rdbuf();
   return buffer.str();
+}
+
+// Get directory containing this executable
+fs::path getExecutableDir() {
+  static fs::path dir;
+  if (!dir.empty()) return dir;
+
+#ifdef _WIN32
+  char buf[MAX_PATH];
+  DWORD len = GetModuleFileNameA(NULL, buf, MAX_PATH);
+  if (len > 0 && len < MAX_PATH) {
+    dir = fs::path(buf).parent_path();
+    return dir;
+  }
+#else
+  char buf[PATH_MAX];
+  ssize_t len = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+  if (len != -1) {
+    buf[len] = '\0';
+    dir = fs::path(buf).parent_path();
+    return dir;
+  }
+#endif
+  dir = fs::current_path();
+  return dir;
 }
 
 // Get cross-platform temp directory
@@ -119,34 +152,53 @@ std::string loadApiKey(const std::string &argKey) {
   // Check current directory first
   if (fs::exists("nexus_apikey.txt"))
     return trim(readFile("nexus_apikey.txt"));
-  // Check TUI config directory
-  const char* home = std::getenv("HOME");
+  // Check TUI config directory (platform-specific)
 #ifdef _WIN32
-  if (!home) home = std::getenv("USERPROFILE");
-#endif
-  if (home) {
-    std::string configKey = std::string(home) + "/.config/nexusbridge/apikey.txt";
+  const char* appData = std::getenv("APPDATA");
+  if (appData) {
+    fs::path configKey = fs::path(appData) / "NexusBridge" / "apikey.txt";
     if (fs::exists(configKey))
-      return trim(readFile(configKey));
+      return trim(readFile(configKey.string()));
   }
+#else
+  const char* home = std::getenv("HOME");
+  if (home) {
+    fs::path configKey = fs::path(home) / ".config" / "nexusbridge" / "apikey.txt";
+    if (fs::exists(configKey))
+      return trim(readFile(configKey.string()));
+  }
+#endif
   return "";
 }
 
 std::string get7zCommand() {
 #ifdef _WIN32
-  const std::string bundled = "7za.exe";
+  const std::string exeName = "7za.exe";
 #else
-  const std::string bundled = "./7zzs";
+  const std::string exeName = "7zzs";
 #endif
 
-  if (fs::exists(bundled)) {
+  // First check in executable's directory
+  fs::path exeDir = getExecutableDir();
+  fs::path bundledPath = exeDir / exeName;
+  if (fs::exists(bundledPath)) {
 #ifndef _WIN32
     // Ensure it's executable on Linux
-    std::string chmod = "chmod +x " + bundled;
+    std::string chmod = "chmod +x " + bundledPath.string();
     std::system(chmod.c_str());
 #endif
-    return bundled;
+    return bundledPath.string();
   }
+
+  // Fallback: check current directory
+  if (fs::exists(exeName)) {
+#ifndef _WIN32
+    std::string chmod = "chmod +x ./" + exeName;
+    std::system(chmod.c_str());
+#endif
+    return "./" + exeName;
+  }
+
   return "7z"; // Fallback to global
 }
 
