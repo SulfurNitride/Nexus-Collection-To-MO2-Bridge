@@ -736,7 +736,12 @@ int main() {
 
               // Call NexusBridge CLI with --yes to auto-continue on failures
               // (popen doesn't allow stdin interaction, so we auto-continue)
+#ifdef _WIN32
+              // Windows: use cmd /c to properly handle paths and redirect stderr
+              std::string cmd = "cmd /c \"\"" + nexusBridge + "\" \"" + url + "\" \"" + mo2 + "\" --yes 2>&1\"";
+#else
               std::string cmd = "\"" + nexusBridge + "\" \"" + url + "\" \"" + mo2 + "\" --yes 2>&1";
+#endif
               FILE* pipe = popen(cmd.c_str(), "r");
               if (pipe) {
                 char buffer[512];
