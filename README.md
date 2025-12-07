@@ -4,27 +4,13 @@ A lightweight, standalone bridge tool to install Nexus Collections directly into
 
 # [DISCORD](https://discord.gg/9JWQzSeUWt)
 
+# [NEXUS RELEASE](https://www.nexusmods.com/site/mods/1563)
+
 ## Features
 *   **Direct Installation:** Installs collections directly to your MO2 `mods` folder.
 *   **Zero Dependencies:** Bundles everything you need (including 7-Zip and Loot). No need to install Python, Node.js, or other runtimes.
 *   **FOMOD Support:** Automatically handles FOMOD installers with the correct options selected by the collection curator.
 *   **Cross-Platform:** Native support for Windows and Linux.
-
-## Installation
-
-### Windows
-1.  Go to the [Releases](https://github.com/SulfurNitride/Nexus-Collection-To-MO2-Bridge/releases) page.
-2.  Download `NexusBridge-Windows-x64.zip`.
-3.  Extract the zip file anywhere.
-4.  Run `NexusBridge.exe`.
-
-### Linux
-1.  Go to the [Releases](https://github.com/SulfurNitride/Nexus-Collection-To-MO2-Bridge/releases) page.
-2.  Download `NexusBridge-Linux-x64.tar.gz`.
-3.  Extract the archive.
-4.  Run `./NexusBridge`.
-
-*Note: Linux users may need to install `libcurl4` if not already present (standard on most distros).*
 
 ## Usage
 1.  **API Key:** On first run, you will be asked for your Nexus Mods API Key (Premium required for automatic downloads).
