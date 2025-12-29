@@ -88,6 +88,8 @@ endif()
 
 if(MSVC)
     target_compile_options(NexusBridge PRIVATE /W4 /wd4996 /wd4101 /wd4251)
+    # Use static runtime to avoid requiring VC++ Redistributable
+    set_property(TARGET NexusBridge PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 else()
     target_compile_options(NexusBridge PRIVATE -Wall -Wextra)
 endif()
