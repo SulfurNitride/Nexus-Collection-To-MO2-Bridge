@@ -98,6 +98,12 @@ public static class ProtocolHandlerService
         var exePath = Environment.ProcessPath
             ?? Path.Combine(AppContext.BaseDirectory, "NexusBridgeGui");
 
+        // Verify the executable exists
+        if (!File.Exists(exePath))
+        {
+            return (false, $"Executable not found at: {exePath}\n\nTry running from the extracted folder.");
+        }
+
         var desktopContent = $@"[Desktop Entry]
 Name=NexusBridge
 Comment=Nexus Mods Collection Installer
@@ -112,20 +118,35 @@ Categories=Utility;
         var desktopFilePath = GetDesktopFilePath();
         var directory = Path.GetDirectoryName(desktopFilePath);
 
-        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-            Directory.CreateDirectory(directory);
+        try
+        {
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                Directory.CreateDirectory(directory);
 
-        File.WriteAllText(desktopFilePath, desktopContent);
+            File.WriteAllText(desktopFilePath, desktopContent);
+        }
+        catch (Exception ex)
+        {
+            return (false, $"Failed to write .desktop file: {ex.Message}\n\nPath: {desktopFilePath}");
+        }
 
         // Register with xdg-mime
-        var process = Process.Start(new ProcessStartInfo
+        try
         {
-            FileName = "xdg-mime",
-            Arguments = $"default nexusbridge-nxm.desktop x-scheme-handler/{ProtocolScheme}",
-            UseShellExecute = false,
-            CreateNoWindow = true
-        });
-        process?.WaitForExit();
+            var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = "xdg-mime",
+                Arguments = $"default nexusbridge-nxm.desktop x-scheme-handler/{ProtocolScheme}",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+            process?.WaitForExit();
+        }
+        catch (Exception ex)
+        {
+            // xdg-mime not found - continue with direct mimeapps.list update
+            System.Diagnostics.Debug.WriteLine($"xdg-mime failed: {ex.Message}");
+        }
 
         // Also directly update mimeapps.list for better compatibility
         try
@@ -199,11 +220,32 @@ Categories=Utility;
         // Verify registration worked
         if (IsRegisteredLinux())
         {
-            return (true, "Protocol handler registered successfully.\nnxm:// URLs will now open with NexusBridge.");
+            return (true, $"Protocol handler registered successfully.\nnxm:// URLs will now open with NexusBridge.\n\nExecutable: {exePath}");
         }
         else
         {
-            return (false, "Registration may have failed. Try closing your browser and clicking Re-register.\n\nIf it still doesn't work, another application may be overriding the nxm:// handler.");
+            // Get current handler for diagnostics
+            string currentHandler = "unknown";
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "xdg-mime",
+                    Arguments = $"query default x-scheme-handler/{ProtocolScheme}",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    CreateNoWindow = true
+                };
+                var p = Process.Start(psi);
+                if (p != null)
+                {
+                    currentHandler = p.StandardOutput.ReadToEnd().Trim();
+                    p.WaitForExit();
+                }
+            }
+            catch { }
+
+            return (false, $"Registration failed.\n\nCurrent handler: {currentHandler}\nExpected: nexusbridge-nxm.desktop\n\nDesktop file: {desktopFilePath}\nExecutable: {exePath}\n\nTry closing your browser and running again.");
         }
     }
 
