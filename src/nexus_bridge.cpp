@@ -1238,8 +1238,8 @@ void safePrint(const std::string &msg) {
 
 // Install a single mod (can be called from thread pool)
 bool installMod(const InstallTask &task) {
-  std::string extractPath =
-      task.tempDir + "/" + task.folderName + "_" + std::to_string(task.index);
+  // Use tempDir directly - it's already unique per mod (e.g., /tmp/nb_ext/m123)
+  std::string extractPath = task.tempDir;
 
   try {
     // Cleanup any existing extraction
@@ -2438,7 +2438,10 @@ int main(int argc, char *argv[]) {
   std::string modsDir = mo2Path + "/mods";
   std::string downloadsDir = mo2Path + "/downloads";
   std::string profilesDir = mo2Path + "/profiles/" + profileName;
-  std::string tempDir = mo2Path + "/temp_extract";
+  // Use system temp dir with short path to avoid Windows MAX_PATH (260 char) limit
+  // Long paths like "mo2Path/temp_extract/ModName/ModName_idx/archive_contents..."
+  // easily exceed this limit with deeply nested mod archives
+  std::string tempDir = (getTempDir() / "nb_ext").string();
 
   fs::create_directories(modsDir);
   fs::create_directories(downloadsDir);
@@ -2952,8 +2955,9 @@ int main(int argc, char *argv[]) {
     InstallTask task;
     task.archivePath = archivePath;
     task.destModPath = modsDir + "/" + modFolderNames[idx];
-    task.tempDir = tempDir + "/" + modFolderNames[idx];
-    task.folderName = modFolderNames[idx];
+    // Use short numeric folder to avoid Windows MAX_PATH limit
+    task.tempDir = tempDir + "/m" + std::to_string(idx);
+    task.folderName = "m" + std::to_string(idx);
     task.modName = collection.mods[idx].name;
     task.choices = collection.mods[idx].choices;
     task.index = idx;
@@ -3049,6 +3053,15 @@ int main(int argc, char *argv[]) {
       ModListGenerator::generateModOrderCombined(collection.mods, collection.modRules, pluginOrder, modsDir);
 
   ModListGenerator::writeModList(profilesDir + "/modlist.txt", modOrder);
+
+  // Cleanup temp directory
+  try {
+    if (fs::exists(tempDir)) {
+      fs::remove_all(tempDir);
+    }
+  } catch (...) {
+    // Ignore cleanup errors
+  }
 
   // Summary
   std::cout << std::endl << "=== Summary ===" << std::endl;
