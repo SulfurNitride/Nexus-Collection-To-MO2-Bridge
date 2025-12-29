@@ -63,8 +63,17 @@ jobs:
         mkdir dist
         cp build/NexusBridge dist/
         cp publish/linux/NexusBridgeGui dist/
-        # Find and copy libloot (it might be named libloot.so or liblibloot.so)
-        find external/libloot/target/release -name "lib*loot.so" -exec cp {} dist/libloot.so \;
+        # Find and copy libloot - preserve original name and create symlink for compatibility
+        LOOT_LIB=$(find external/libloot/target/release -name "lib*loot.so" | head -1)
+        if [ -n "$LOOT_LIB" ]; then
+          LOOT_NAME=$(basename "$LOOT_LIB")
+          cp "$LOOT_LIB" "dist/$LOOT_NAME"
+          # Create symlinks for both possible names
+          cd dist
+          [ "$LOOT_NAME" != "libloot.so" ] && ln -sf "$LOOT_NAME" libloot.so
+          [ "$LOOT_NAME" != "liblibloot.so" ] && ln -sf "$LOOT_NAME" liblibloot.so
+          cd ..
+        fi
         cp 7zzs dist/
         tar -czf NexusBridge-Linux-x64.tar.gz -C dist .
 

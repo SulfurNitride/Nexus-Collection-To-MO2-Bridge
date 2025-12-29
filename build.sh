@@ -28,9 +28,16 @@ cd ..
 # Copy CLI and libloot to dist
 echo "Copying files to dist..."
 cp build/NexusBridge dist/
-cp external/libloot/target/release/libloot.so dist/ 2>/dev/null || \
-cp external/libloot/target/release/liblibloot.so dist/libloot.so 2>/dev/null || \
-find external/libloot/target/release -name "lib*loot.so" -exec cp {} dist/libloot.so \;
+# Find libloot and create symlinks for both possible names
+LOOT_LIB=$(find external/libloot/target/release -name "lib*loot.so" | head -1)
+if [ -n "$LOOT_LIB" ]; then
+  LOOT_NAME=$(basename "$LOOT_LIB")
+  cp "$LOOT_LIB" "dist/$LOOT_NAME"
+  cd dist
+  [ "$LOOT_NAME" != "libloot.so" ] && ln -sf "$LOOT_NAME" libloot.so
+  [ "$LOOT_NAME" != "liblibloot.so" ] && ln -sf "$LOOT_NAME" liblibloot.so
+  cd ..
+fi
 
 # Download 7zip if not present
 if [ ! -f dist/7zzs ]; then
