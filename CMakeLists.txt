@@ -9,19 +9,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(CURL REQUIRED)
 find_package(Threads REQUIRED)
 
-# Fetch FTXUI for TUI
-include(FetchContent)
-cmake_policy(SET CMP0169 OLD) # Suppress FetchContent_Populate deprecation warning
-FetchContent_Declare(ftxui
-  GIT_REPOSITORY https://github.com/ArthurSonzogni/ftxui
-  GIT_TAG v5.0.0
-)
-FetchContent_GetProperties(ftxui)
-if(NOT ftxui_POPULATED)
-  FetchContent_Populate(ftxui)
-  add_subdirectory(${ftxui_SOURCE_DIR} ${ftxui_BINARY_DIR} EXCLUDE_FROM_ALL)
-endif()
-
 # Include directories for bundled libraries
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
@@ -48,7 +35,6 @@ if(WIN32)
     # Windows
     set(LIBLOOT_LIB_DIR "${CMAKE_SOURCE_DIR}/external/libloot/target/release")
     find_library(LIBLOOT_LIB NAMES loot loot.dll libloot libloot.dll PATHS ${LIBLOOT_LIB_DIR} NO_DEFAULT_PATH)
-    # Also find libloot-cpp static lib for cxx symbols
     find_library(LIBLOOT_CPP_LIB NAMES loot_cpp libloot_cpp PATHS ${LIBLOOT_LIB_DIR} NO_DEFAULT_PATH)
 else()
     # Linux
@@ -58,16 +44,14 @@ else()
         message(WARNING "Could not find libloot.so in ${LIBLOOT_LIB_DIR}, falling back to hardcoded path")
         set(LIBLOOT_LIB "${LIBLOOT_LIB_DIR}/libloot.so")
     endif()
-    
-    # Find libloot-cpp static lib (likely liblibloot_cpp.a)
+
     find_library(LIBLOOT_CPP_LIB NAMES libloot_cpp PATHS ${LIBLOOT_LIB_DIR} NO_DEFAULT_PATH)
     if(NOT LIBLOOT_CPP_LIB)
-         # Try with lib prefix explicitly if not found (cmake usually handles this but just in case)
-         set(LIBLOOT_CPP_LIB "${LIBLOOT_LIB_DIR}/liblibloot_cpp.a")
+        set(LIBLOOT_CPP_LIB "${LIBLOOT_LIB_DIR}/liblibloot_cpp.a")
     endif()
 endif()
 
-# Main executable - new implementation
+# Main CLI executable
 add_executable(NexusBridge
     src/nexus_bridge.cpp
     src/fomod_installer.cpp
@@ -77,7 +61,7 @@ add_executable(NexusBridge
     ${LIBLOOT_CXX_SUPPORT_SOURCE}
 )
 
-target_include_directories(NexusBridge PRIVATE 
+target_include_directories(NexusBridge PRIVATE
     ${LIBLOOT_INCLUDE_DIR}
     ${LIBLOOT_CXXBRIDGE_DIR}
     "${LIBLOOT_DIR}/src"
@@ -98,62 +82,15 @@ endif()
 if(UNIX)
     set_target_properties(NexusBridge PROPERTIES
         BUILD_RPATH "${LIBLOOT_LIB_DIR}"
-        INSTALL_RPATH "${LIBLOOT_LIB_DIR}"
+        INSTALL_RPATH "$ORIGIN"
     )
 endif()
 
 if(MSVC)
-    # MSVC Flags: /W4 (warning level 4), disable specific noisy warnings
-    # wd4996: fopen deprecated
-    # wd4101: unreferenced local variable
-    # wd4251: class needs to have dll-interface (common with templates)
     target_compile_options(NexusBridge PRIVATE /W4 /wd4996 /wd4101 /wd4251)
 else()
     target_compile_options(NexusBridge PRIVATE -Wall -Wextra)
 endif()
 
-# Legacy executable (old implementation) - for comparison
-add_executable(NexusBridgeLegacy
-    src/main.cpp
-    src/json.cpp
-    src/xml.cpp
-    src/downloader.cpp
-    src/fomod.cpp
-    src/installer.cpp
-    src/api_client.cpp
-)
-
-target_link_libraries(NexusBridgeLegacy PRIVATE
-    CURL::libcurl
-    Threads::Threads
-)
-
-# FOMOD test executable
-add_executable(TestFomod
-    src/test_fomod_new.cpp
-    src/fomod_installer.cpp
-    include/pugixml/pugixml.cpp
-)
-
-target_link_libraries(TestFomod PRIVATE Threads::Threads)
-
-# TUI executable (calls NexusBridge CLI - must be in same directory)
-add_executable(NexusBridgeTUI
-    src/tui_main.cpp
-)
-
-target_link_libraries(NexusBridgeTUI PRIVATE
-    Threads::Threads
-    ftxui::screen
-    ftxui::dom
-    ftxui::component
-)
-
-if(MSVC)
-    target_compile_options(NexusBridgeTUI PRIVATE /W4)
-else()
-    target_compile_options(NexusBridgeTUI PRIVATE -Wall -Wextra)
-endif()
-
-# Install targets
-install(TARGETS NexusBridge NexusBridgeTUI DESTINATION bin)
+# Install target
+install(TARGETS NexusBridge DESTINATION bin)

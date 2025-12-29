@@ -1,0 +1,97 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NexusBridgeGui.ViewModels"
+             x:Class="NexusBridgeGui.Views.ProgressView"
+             x:DataType="vm:ProgressViewModel">
+
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto">
+        <TextBlock Grid.Row="0" Text="Installing Collection" FontSize="20" FontWeight="Bold" Margin="0,0,0,16"/>
+
+        <!-- Phase -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
+            <TextBlock Text="Phase:" FontWeight="Bold"/>
+            <TextBlock Text="{Binding Phase}" Foreground="#00d4ff"/>
+        </StackPanel>
+
+        <!-- Progress Bar -->
+        <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+            <ProgressBar Grid.Column="0" Value="{Binding Progress}" Maximum="1" Height="24"/>
+            <TextBlock Grid.Column="1" Text="{Binding Progress, StringFormat={}{0:P0}}" Margin="12,0,0,0" VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- Download Stats (only visible during download) -->
+        <Border Grid.Row="3" Background="#1e293b" CornerRadius="4" Padding="12,8" Margin="0,0,0,12"
+                IsVisible="{Binding DownloadSpeed, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <StackPanel Orientation="Horizontal" Spacing="24">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBlock Text="Speed:" Foreground="Gray"/>
+                    <TextBlock Text="{Binding DownloadSpeed}" Foreground="#22c55e" FontWeight="SemiBold"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding TotalDownloadMb}">
+                    <TextBlock Text="Size:" Foreground="Gray"/>
+                    <TextBlock Foreground="White">
+                        <TextBlock.Text>
+                            <MultiBinding StringFormat="{}{0:F1} / {1:F1} MB">
+                                <Binding Path="DownloadedMb"/>
+                                <Binding Path="TotalDownloadMb"/>
+                            </MultiBinding>
+                        </TextBlock.Text>
+                    </TextBlock>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding Eta, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock Text="ETA:" Foreground="Gray"/>
+                    <TextBlock Text="{Binding Eta}" Foreground="#f59e0b"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Stats -->
+        <WrapPanel Grid.Row="4" Margin="0,0,0,16">
+            <StackPanel Orientation="Horizontal" Margin="0,0,16,4">
+                <TextBlock Text="Total: " FontWeight="Bold"/>
+                <TextBlock Text="{Binding TotalMods}"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,16,4">
+                <TextBlock Text="Downloaded: " FontWeight="Bold"/>
+                <TextBlock Text="{Binding Downloaded}" Foreground="#3b82f6"/>
+                <TextBlock Text="/"/>
+                <TextBlock Text="{Binding ToDownload}"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,16,4">
+                <TextBlock Text="Installed: " FontWeight="Bold"/>
+                <TextBlock Text="{Binding Installed}" Foreground="#22c55e"/>
+                <TextBlock Text="/"/>
+                <TextBlock Text="{Binding ToInstall}"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,16,4">
+                <TextBlock Text="Skipped: " FontWeight="Bold"/>
+                <TextBlock Text="{Binding Skipped}" Foreground="#f59e0b"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,16,4">
+                <TextBlock Text="Failed: " FontWeight="Bold"/>
+                <TextBlock Text="{Binding Failed}" Foreground="#ef4444"/>
+            </StackPanel>
+        </WrapPanel>
+
+        <!-- Log -->
+        <Border Grid.Row="5" BorderBrush="Gray" BorderThickness="1" CornerRadius="4" Padding="8">
+            <ScrollViewer>
+                <ItemsControl ItemsSource="{Binding LogMessages}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding}" FontFamily="Consolas,Monospace" FontSize="12" TextWrapping="Wrap"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="Back to Menu"
+                    Command="{Binding GoBackCommand}"
+                    IsEnabled="{Binding !IsRunning}"
+                    Padding="24,12"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

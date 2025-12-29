@@ -12,3 +12,11 @@ external/libloot/cpp/build/
 *.swp
 .DS_Store
 __pycache__/
+
+# Build outputs
+dist/
+publish/
+
+# .NET
+NexusBridgeGui/bin/
+NexusBridgeGui/obj/

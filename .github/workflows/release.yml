@@ -28,6 +28,11 @@ jobs:
       with:
         toolchain: stable
 
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
     - name: Build libloot
       run: |
         cd external/libloot
@@ -35,12 +40,17 @@ jobs:
         # Debug: Find cxx.cc
         find target -name "cxx.cc"
 
-    - name: Build NexusBridge
+    - name: Build NexusBridge CLI
       run: |
         mkdir build
         cd build
         cmake -DCMAKE_BUILD_TYPE=Release ..
-        make
+        make NexusBridge
+
+    - name: Build NexusBridgeGui
+      run: |
+        cd NexusBridgeGui
+        dotnet publish -c Release -r linux-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o ../publish/linux
 
     - name: Download 7-Zip (Linux)
       run: |
@@ -52,7 +62,7 @@ jobs:
       run: |
         mkdir dist
         cp build/NexusBridge dist/
-        cp build/NexusBridgeTUI dist/
+        cp publish/linux/NexusBridgeGui dist/
         # Find and copy libloot (it might be named libloot.so or liblibloot.so)
         find external/libloot/target/release -name "lib*loot.so" -exec cp {} dist/libloot.so \;
         cp 7zzs dist/
@@ -76,6 +86,11 @@ jobs:
       with:
         toolchain: stable
 
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
     - name: Install Dependencies (vcpkg)
       run: |
         vcpkg install curl:x64-windows
@@ -88,12 +103,17 @@ jobs:
         cargo build --release -p libloot -p libloot-cpp
         # Result is in target/release/loot.dll (libloot creates loot.dll on Windows usually)
 
-    - name: Build NexusBridge
+    - name: Build NexusBridge CLI
       run: |
         mkdir build
         cd build
         cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake ..
-        cmake --build . --config Release
+        cmake --build . --config Release --target NexusBridge
+
+    - name: Build NexusBridgeGui
+      run: |
+        cd NexusBridgeGui
+        dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o ../publish/windows
 
     - name: Download 7-Zip (Windows)
       run: |
@@ -105,15 +125,15 @@ jobs:
       run: |
         mkdir dist
         copy build\Release\NexusBridge.exe dist\
-        copy build\Release\NexusBridgeTUI.exe dist\
-        
+        copy publish\windows\NexusBridgeGui.exe dist\
+
         # Find loot.dll recursively
         $loot = Get-ChildItem -Path external\libloot\target -Recurse -Include "loot.dll","libloot.dll" | Select-Object -First 1
-        if ($loot) { 
+        if ($loot) {
             Write-Host "Found libloot: $($loot.FullName)"
-            copy $loot.FullName dist\libloot.dll 
-        } else { 
-            Write-Error "Could not find loot.dll or libloot.dll" 
+            copy $loot.FullName dist\libloot.dll
+        } else {
+            Write-Error "Could not find loot.dll or libloot.dll"
         }
 
         # Try to copy vcpkg dependencies (libcurl, zlib)
@@ -123,11 +143,9 @@ jobs:
             copy "$vcpkgBin\libcurl.dll" dist\ -ErrorAction SilentlyContinue
             copy "$vcpkgBin\zlib1.dll" dist\ -ErrorAction SilentlyContinue
         }
-        
+
         copy 7za.exe dist\
-        # We might need libcurl.dll depending on vcpkg linkage, usually vcpkg handles it or we static link
-        # For safety, we'll try to find and copy it if it exists, or rely on static linking
-        
+
     - name: Create Zip
       run: |
         Compress-Archive -Path dist/* -DestinationPath NexusBridge-Windows-x64.zip
@@ -147,7 +165,7 @@ jobs:
       with:
         name: linux-build
         path: .
-    
+
     - uses: actions/download-artifact@v4
       with:
         name: windows-build
