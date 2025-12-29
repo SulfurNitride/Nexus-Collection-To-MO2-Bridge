@@ -64,6 +64,23 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Windows Long Path Warning -->
+                <Border Background="#7f1d1d" CornerRadius="4" Padding="12" Margin="0,8,0,0" IsVisible="{Binding ShowLongPathWarning}">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="!" FontWeight="Bold" Foreground="#ef4444"/>
+                            <TextBlock Text="{Binding LongPathStatus}" Foreground="#fca5a5" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <Button Content="Enable Long Path Support"
+                                Command="{Binding EnableLongPathsCommand}"
+                                IsEnabled="{Binding !IsEnablingLongPath}"
+                                Background="#dc2626"
+                                Foreground="White"
+                                Padding="12,8"
+                                HorizontalAlignment="Left"/>
+                    </StackPanel>
+                </Border>
+
                 <!-- Premium status and download mode info -->
                 <Border CornerRadius="4" Padding="12" Margin="0,8,0,0">
                     <Border.Background>

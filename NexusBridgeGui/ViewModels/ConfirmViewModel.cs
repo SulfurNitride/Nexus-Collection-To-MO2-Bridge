@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Avalonia.Threading;
+using NexusBridgeGui.Services;
 
 namespace NexusBridgeGui.ViewModels;
 
@@ -68,6 +69,16 @@ public partial class ConfirmViewModel : ViewModelBase
     // Computed visibility for non-premium buttons
     public bool ShowNonPremiumDownload => !IsPremium && NeedsDownloads;
     public bool ShowNonPremiumContinue => !IsPremium && !NeedsDownloads;
+
+    // Windows Long Path support
+    [ObservableProperty]
+    private bool _showLongPathWarning;
+
+    [ObservableProperty]
+    private string _longPathStatus = "";
+
+    [ObservableProperty]
+    private bool _isEnablingLongPath;
 
     // Download queue for non-premium mode
     public List<DownloadQueueItem> DownloadQueue { get; } = new();
@@ -213,6 +224,14 @@ public partial class ConfirmViewModel : ViewModelBase
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 IsLoading = false;
+
+                // Check Windows Long Path support
+                if (WindowsLongPathService.IsWindows && !WindowsLongPathService.IsLongPathEnabled())
+                {
+                    ShowLongPathWarning = true;
+                    LongPathStatus = "Windows long path support is disabled. Some mods with deeply nested files may fail to install.";
+                }
+
                 if (!foundResult)
                 {
                     HasError = true;
@@ -284,6 +303,29 @@ public partial class ConfirmViewModel : ViewModelBase
     private void Confirm()
     {
         NavigateRequested?.Invoke(this, new NavigationEventArgs(NavigationTarget.Progress, _collectionUrl));
+    }
+
+    [RelayCommand]
+    private async Task EnableLongPaths()
+    {
+        IsEnablingLongPath = true;
+        LongPathStatus = "Requesting administrator access...";
+
+        await Task.Run(() =>
+        {
+            var (success, message) = WindowsLongPathService.EnableLongPaths();
+
+            Dispatcher.UIThread.Post(() =>
+            {
+                IsEnablingLongPath = false;
+                LongPathStatus = message;
+
+                if (success)
+                {
+                    ShowLongPathWarning = false;
+                }
+            });
+        });
     }
 
     [RelayCommand]
