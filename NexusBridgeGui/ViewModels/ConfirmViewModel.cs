@@ -94,14 +94,25 @@ public partial class ConfirmViewModel : ViewModelBase
             return;
         }
 
+        // Strip trailing backslashes from path - "path\" causes \"  to be interpreted as escaped quote
+        var mo2PathClean = _mo2Path.TrimEnd('\\', '/');
+        var arguments = $"\"{_collectionUrl}\" \"{mo2PathClean}\" --query --profile \"{_profileName}\"";
+
+        // Debug: Write command to file for troubleshooting
+        try {
+            var debugPath = Path.Combine(Path.GetDirectoryName(nexusBridge) ?? ".", "debug_command.txt");
+            File.WriteAllText(debugPath, $"FileName: {nexusBridge}\nArguments: {arguments}\n");
+        } catch { }
+
         var startInfo = new ProcessStartInfo
         {
             FileName = nexusBridge,
-            Arguments = $"\"{_collectionUrl}\" \"{_mo2Path}\" --query --profile \"{_profileName}\"",
+            Arguments = arguments,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
-            CreateNoWindow = true
+            CreateNoWindow = true,
+            WorkingDirectory = Path.GetDirectoryName(nexusBridge) // Set working dir to CLI location
         };
 
         try

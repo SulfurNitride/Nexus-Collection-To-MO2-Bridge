@@ -255,14 +255,17 @@ public partial class NonPremiumDownloadViewModel : ViewModelBase
             return;
         }
 
+        // Strip trailing backslashes from path - "path\" causes \" to be interpreted as escaped quote
+        var mo2PathClean = _mo2Path.TrimEnd('\\', '/');
         var startInfo = new ProcessStartInfo
         {
             FileName = nexusBridge,
-            Arguments = $"\"{_collectionUrl}\" \"{_mo2Path}\" --profile \"{_profileName}\" --nxm \"{_receivedNxmUrl}\"",
+            Arguments = $"\"{_collectionUrl}\" \"{mo2PathClean}\" --profile \"{_profileName}\" --nxm \"{_receivedNxmUrl}\"",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
-            CreateNoWindow = true
+            CreateNoWindow = true,
+            WorkingDirectory = Path.GetDirectoryName(nexusBridge) // Set working dir to CLI location
         };
 
         try
