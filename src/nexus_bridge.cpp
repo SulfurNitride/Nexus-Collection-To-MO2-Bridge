@@ -807,7 +807,7 @@ bool extractArchive(const std::string &archivePath,
     // Use 7z for all supported formats
 #ifdef _WIN32
     // Windows cmd.exe needs outer quotes when inner quotes are present
-    cmd = "\"\"" + sevenZip + "\" x -y -o\"" + destPath + "\" \"" + archivePath + "\"\"";
+    cmd = "\"\"" + sevenZip + "\" x -y -o\"" + destPath + "\" \"" + archivePath + "\"\" > NUL 2>&1";
 #else
     cmd = sevenZip + " x -y -o\"" + destPath + "\" \"" + archivePath +
           "\" > /dev/null 2>&1";
@@ -2312,7 +2312,7 @@ std::string fetchCollectionFromNexus(const std::string &game,
 
 #ifdef _WIN32
     // Windows: need to be careful with quoting for cmd.exe
-    std::string extractCmd = "\"\"" + sevenZip + "\" x -o\"" + extractDir.string() + "\" \"" + archivePath.string() + "\" collection.json -y\"";
+    std::string extractCmd = "\"\"" + sevenZip + "\" x -o\"" + extractDir.string() + "\" \"" + archivePath.string() + "\" collection.json -y\" > NUL 2>&1";
 #else
     std::string extractCmd = sevenZip + " x -o" + extractDir.string() + " " + archivePath.string() + " collection.json -y > /dev/null 2>&1";
 #endif
