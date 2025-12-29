@@ -89,7 +89,7 @@ public partial class ConfirmViewModel : ViewModelBase
             {
                 IsLoading = false;
                 HasError = true;
-                ErrorMessage = "NexusBridge executable not found!";
+                ErrorMessage = $"NexusBridge CLI executable not found!\n\n{GetSearchedPaths()}";
             });
             return;
         }
@@ -205,9 +205,22 @@ public partial class ConfirmViewModel : ViewModelBase
                 if (!foundResult)
                 {
                     HasError = true;
-                    ErrorMessage = "Failed to query collection. Check your API key and collection URL.";
+                    ErrorMessage = "Failed to query collection.";
+
+                    // Show exit code
+                    if (process.ExitCode != 0)
+                        ErrorMessage += $"\n\nExit code: {process.ExitCode}";
+
+                    // Show stderr if any
                     if (!string.IsNullOrEmpty(error))
-                        ErrorMessage += $"\n\n{error}";
+                        ErrorMessage += $"\n\nError output:\n{error}";
+
+                    // Show stdout if no stderr (might have useful info)
+                    if (string.IsNullOrEmpty(error) && !string.IsNullOrEmpty(output))
+                        ErrorMessage += $"\n\nOutput:\n{output}";
+
+                    // Show path for debugging
+                    ErrorMessage += $"\n\nCLI path: {nexusBridge}";
                 }
             });
         }
@@ -217,7 +230,7 @@ public partial class ConfirmViewModel : ViewModelBase
             {
                 IsLoading = false;
                 HasError = true;
-                ErrorMessage = $"Error: {ex.Message}";
+                ErrorMessage = $"Error starting CLI: {ex.Message}\n\nCLI path: {nexusBridge}";
             });
         }
     }
@@ -246,6 +259,14 @@ public partial class ConfirmViewModel : ViewModelBase
             return cwdPath;
 
         return "";
+    }
+
+    // For debugging - show where we looked
+    private static string GetSearchedPaths()
+    {
+        var exeDir = AppContext.BaseDirectory;
+        var exeName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "NexusBridge.exe" : "NexusBridge";
+        return $"Searched:\n- {Path.Combine(exeDir, exeName)}\n- {Path.Combine(Directory.GetCurrentDirectory(), exeName)}";
     }
 
     [RelayCommand]
