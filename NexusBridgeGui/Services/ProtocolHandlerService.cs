@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace NexusBridgeGui.Services;
@@ -60,7 +62,34 @@ public static class ProtocolHandlerService
 
     private static bool IsRegisteredLinux()
     {
-        return File.Exists(GetDesktopFilePath());
+        // Check if we're actually the default handler, not just if our file exists
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "xdg-mime",
+                Arguments = $"query default x-scheme-handler/{ProtocolScheme}",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                CreateNoWindow = true
+            };
+            var process = Process.Start(psi);
+            if (process != null)
+            {
+                string output = process.StandardOutput.ReadToEnd().Trim();
+                process.WaitForExit();
+                return output == "nexusbridge-nxm.desktop";
+            }
+        }
+        catch { }
+
+        return false;
+    }
+
+    private static string GetMimeappsListPath()
+    {
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        return Path.Combine(home, ".config", "mimeapps.list");
     }
 
     private static (bool, string) RegisterLinux()
@@ -97,6 +126,65 @@ Categories=Utility;
         });
         process?.WaitForExit();
 
+        // Also directly update mimeapps.list for better compatibility
+        try
+        {
+            var mimeappsPath = GetMimeappsListPath();
+            var mimeType = $"x-scheme-handler/{ProtocolScheme}";
+            var lines = new List<string>();
+            bool inDefaultApps = false;
+            bool foundMimeType = false;
+
+            if (File.Exists(mimeappsPath))
+            {
+                foreach (var line in File.ReadAllLines(mimeappsPath))
+                {
+                    if (line.Trim() == "[Default Applications]")
+                    {
+                        inDefaultApps = true;
+                        lines.Add(line);
+                    }
+                    else if (line.StartsWith("[") && line.EndsWith("]"))
+                    {
+                        // New section - if we were in Default Apps and didn't find our entry, add it
+                        if (inDefaultApps && !foundMimeType)
+                        {
+                            lines.Add($"{mimeType}=nexusbridge-nxm.desktop");
+                            foundMimeType = true;
+                        }
+                        inDefaultApps = false;
+                        lines.Add(line);
+                    }
+                    else if (inDefaultApps && line.StartsWith($"{mimeType}="))
+                    {
+                        // Replace existing entry
+                        lines.Add($"{mimeType}=nexusbridge-nxm.desktop");
+                        foundMimeType = true;
+                    }
+                    else
+                    {
+                        lines.Add(line);
+                    }
+                }
+            }
+
+            // If no Default Applications section or no entry found, add it
+            if (!foundMimeType)
+            {
+                if (!lines.Any(l => l.Trim() == "[Default Applications]"))
+                {
+                    lines.Add("[Default Applications]");
+                }
+                lines.Add($"{mimeType}=nexusbridge-nxm.desktop");
+            }
+
+            File.WriteAllLines(mimeappsPath, lines);
+        }
+        catch
+        {
+            // Fall back to just xdg-mime
+        }
+
         // Update desktop database
         var updateDb = Process.Start(new ProcessStartInfo
         {
@@ -107,7 +195,15 @@ Categories=Utility;
         });
         updateDb?.WaitForExit();
 
-        return (true, "Protocol handler registered successfully.\nnxm:// URLs will now open with NexusBridge.");
+        // Verify registration worked
+        if (IsRegisteredLinux())
+        {
+            return (true, "Protocol handler registered successfully.\nnxm:// URLs will now open with NexusBridge.");
+        }
+        else
+        {
+            return (false, "Registration may have failed. Try closing your browser and clicking Re-register.\n\nIf it still doesn't work, another application may be overriding the nxm:// handler.");
+        }
     }
 
     private static (bool, string) UnregisterLinux()
