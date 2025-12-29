@@ -91,10 +91,10 @@ jobs:
       with:
         dotnet-version: '10.0.x'
 
-    - name: Install Dependencies (vcpkg)
+    - name: Install Dependencies (vcpkg - static)
       run: |
-        vcpkg install curl:x64-windows
-        vcpkg install pugixml:x64-windows
+        vcpkg install curl:x64-windows-static
+        vcpkg install pugixml:x64-windows-static
         vcpkg integrate install
 
     - name: Build libloot
@@ -107,7 +107,7 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake ..
+        cmake -DCMAKE_BUILD_TYPE=Release -DVCPKG_TARGET_TRIPLET=x64-windows-static -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake ..
         cmake --build . --config Release --target NexusBridge
 
     - name: Build NexusBridgeGui
@@ -127,7 +127,7 @@ jobs:
         copy build\Release\NexusBridge.exe dist\
         copy publish\windows\NexusBridgeGui.exe dist\
 
-        # Find loot.dll recursively
+        # Find loot.dll recursively (this is the Rust dynamic library)
         $loot = Get-ChildItem -Path external\libloot\target -Recurse -Include "loot.dll","libloot.dll" | Select-Object -First 1
         if ($loot) {
             Write-Host "Found libloot: $($loot.FullName)"
@@ -136,13 +136,7 @@ jobs:
             Write-Error "Could not find loot.dll or libloot.dll"
         }
 
-        # Try to copy vcpkg dependencies (libcurl, zlib)
-        # Default location on GitHub Actions windows runner
-        $vcpkgBin = "C:\vcpkg\installed\x64-windows\bin"
-        if (Test-Path $vcpkgBin) {
-            copy "$vcpkgBin\libcurl.dll" dist\ -ErrorAction SilentlyContinue
-            copy "$vcpkgBin\zlib1.dll" dist\ -ErrorAction SilentlyContinue
-        }
+        # Static linking used - no need to copy curl/zlib DLLs
 
         copy 7za.exe dist\
 
