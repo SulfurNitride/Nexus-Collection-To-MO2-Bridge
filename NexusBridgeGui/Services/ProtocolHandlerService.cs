@@ -94,7 +94,8 @@ public static class ProtocolHandlerService
 
     private static (bool, string) RegisterLinux()
     {
-        var exePath = Process.GetCurrentProcess().MainModule?.FileName
+        // Use Environment.ProcessPath for single-file apps (MainModule.FileName returns temp extraction path)
+        var exePath = Environment.ProcessPath
             ?? Path.Combine(AppContext.BaseDirectory, "NexusBridgeGui");
 
         var desktopContent = $@"[Desktop Entry]
@@ -249,7 +250,8 @@ Categories=Utility;
 
     private static (bool, string) RegisterWindows()
     {
-        var exePath = Process.GetCurrentProcess().MainModule?.FileName
+        // Use Environment.ProcessPath for single-file apps (MainModule.FileName returns temp extraction path)
+        var exePath = Environment.ProcessPath
             ?? Path.Combine(AppContext.BaseDirectory, "NexusBridgeGui.exe");
 
         try
