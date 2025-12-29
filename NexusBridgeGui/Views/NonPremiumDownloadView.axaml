@@ -1,0 +1,159 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NexusBridgeGui.ViewModels"
+             x:Class="NexusBridgeGui.Views.NonPremiumDownloadView"
+             x:DataType="vm:NonPremiumDownloadViewModel">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+        <TextBlock Grid.Row="0" Text="Manual Download (Non-Premium)" FontSize="20" FontWeight="Bold" Margin="0,0,0,8"/>
+
+        <!-- Progress indicator -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,16">
+            <TextBlock Text="Progress:" FontWeight="Bold"/>
+            <TextBlock Text="{Binding QueuePosition}" Foreground="#3b82f6"/>
+            <TextBlock Text="/"/>
+            <TextBlock Text="{Binding QueueTotal}"/>
+        </StackPanel>
+
+        <!-- Scrollable content area -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="12">
+                <!-- Handler registration warning -->
+                <Border Background="#422006" CornerRadius="4" Padding="12"
+                        IsVisible="{Binding !IsHandlerRegistered}">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="!" FontWeight="Bold" Foreground="#f59e0b"/>
+                            <TextBlock Text="NXM Handler not registered" Foreground="#fcd34d" FontWeight="Bold"/>
+                        </StackPanel>
+                        <TextBlock Text="Register NexusBridge to automatically receive download links from Nexus" Foreground="#fcd34d" TextWrapping="Wrap"/>
+                        <Button Content="Register NXM Handler"
+                                Command="{Binding RegisterHandlerCommand}"
+                                Background="#f59e0b"
+                                Foreground="Black"
+                                Padding="16,8"
+                                HorizontalAlignment="Left"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Handler registered confirmation -->
+                <Border Background="#052e16" CornerRadius="4" Padding="12"
+                        IsVisible="{Binding IsHandlerRegistered}">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <TextBlock Text="NXM Handler registered" Foreground="#86efac" FontWeight="Bold" VerticalAlignment="Center"/>
+                        <Button Content="Re-register"
+                                Command="{Binding RegisterHandlerCommand}"
+                                Background="Transparent"
+                                Foreground="#86efac"
+                                BorderThickness="1"
+                                BorderBrush="#86efac"
+                                Padding="8,4"
+                                FontSize="11"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Mod details -->
+                <Border Background="#1e293b" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="{Binding CurrentModName}" FontSize="16" FontWeight="Bold" Foreground="#00d4ff" TextWrapping="Wrap"/>
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Mod ID:" Foreground="Gray" Margin="0,0,8,0"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding CurrentModId}"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="File ID:" Foreground="Gray" Margin="0,0,8,0"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding CurrentFileId}"/>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Size:" Foreground="Gray" Margin="0,0,8,0"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CurrentFileSize}"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Waiting for download -->
+                <Border Background="#172554" CornerRadius="8" Padding="16"
+                        IsVisible="{Binding IsWaitingForUrl}">
+                    <StackPanel Spacing="12" HorizontalAlignment="Center">
+                        <TextBlock Text="Waiting for download link from browser..."
+                                   Foreground="#60a5fa"
+                                   FontSize="16"
+                                   HorizontalAlignment="Center"/>
+                        <ProgressBar IsIndeterminate="True" Width="200"/>
+                        <TextBlock Text="Click 'Slow Download' on the Nexus page, then select NexusBridge"
+                                   Foreground="#93c5fd"
+                                   TextWrapping="Wrap"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center"/>
+                        <Button Content="Reopen Browser Page"
+                                Command="{Binding OpenInBrowserCommand}"
+                                Background="#3b82f6"
+                                Foreground="White"
+                                Padding="16,8"
+                                HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Downloading -->
+                <Border Background="#172554" CornerRadius="8" Padding="16"
+                        IsVisible="{Binding IsDownloading}">
+                    <StackPanel Spacing="8" HorizontalAlignment="Center">
+                        <TextBlock Text="Downloading..."
+                                   Foreground="#60a5fa"
+                                   FontSize="16"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Text="{Binding DownloadProgress}"
+                                   Foreground="#93c5fd"
+                                   HorizontalAlignment="Center"/>
+                        <ProgressBar IsIndeterminate="True" Width="200"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Status message -->
+                <TextBlock Text="{Binding StatusMessage}" Foreground="#22c55e" TextWrapping="Wrap"/>
+
+                <!-- Error message -->
+                <Border Background="#450a0a" CornerRadius="4" Padding="12"
+                        IsVisible="{Binding HasError}">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="{Binding ErrorMessage}" Foreground="#fca5a5" TextWrapping="Wrap"/>
+                        <Button Content="Retry - Open in Browser"
+                                Command="{Binding OpenInBrowserCommand}"
+                                Background="#ef4444"
+                                Foreground="White"
+                                Padding="16,8"
+                                HorizontalAlignment="Left"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Download complete -->
+                <Border Background="#052e16" CornerRadius="4" Padding="12"
+                        IsVisible="{Binding DownloadComplete}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="Downloaded successfully!" Foreground="#86efac" FontWeight="Bold"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Bottom buttons -->
+        <Grid Grid.Row="3" ColumnDefinitions="*,Auto" Margin="0,16,0,0">
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12">
+                <Button Content="Next Mod"
+                        Command="{Binding NextModCommand}"
+                        IsVisible="{Binding DownloadComplete}"
+                        Background="#22c55e"
+                        Foreground="White"
+                        Padding="24,12"/>
+                <Button Content="Skip This Mod"
+                        Command="{Binding SkipModCommand}"
+                        IsEnabled="{Binding !IsDownloading}"
+                        IsVisible="{Binding !DownloadComplete}"
+                        Foreground="#f59e0b"
+                        Padding="24,12"/>
+            </StackPanel>
+
+            <Button Grid.Column="1"
+                    Content="Cancel"
+                    Command="{Binding CancelCommand}"
+                    IsEnabled="{Binding !IsDownloading}"
+                    Padding="24,12"/>
+        </Grid>
+    </Grid>
+</UserControl>

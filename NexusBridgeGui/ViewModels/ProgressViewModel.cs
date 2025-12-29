@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
@@ -17,12 +18,18 @@ public partial class ProgressViewModel : ViewModelBase
 
     private readonly string _collectionUrl;
     private readonly string _mo2Path;
+    private readonly string _profileName;
     private Process? _process;
 
-    // For speed calculation
+    // For speed calculation - rolling average over 10 seconds
     private DateTime _downloadStartTime;
-    private double _lastBytesDownloaded;
-    private DateTime _lastSpeedUpdate;
+    private readonly Queue<(DateTime time, double mb)> _speedSamples = new();
+    private const int SpeedWindowSeconds = 10;
+
+    // Track cumulative download progress (completed files + current file)
+    private double _completedFilesMb;
+    private double _currentFileTotalMb;
+    private double _currentFileProgressMb;
 
     [ObservableProperty]
     private string _phase = "Starting...";
@@ -72,10 +79,11 @@ public partial class ProgressViewModel : ViewModelBase
 
     public ObservableCollection<string> LogMessages { get; } = new();
 
-    public ProgressViewModel(string collectionUrl, string mo2Path)
+    public ProgressViewModel(string collectionUrl, string mo2Path, string profileName)
     {
         _collectionUrl = collectionUrl;
         _mo2Path = mo2Path;
+        _profileName = profileName;
         Task.Run(RunInstallation);
     }
 
@@ -84,6 +92,7 @@ public partial class ProgressViewModel : ViewModelBase
         AddLog($"Starting installation...");
         AddLog($"Collection: {_collectionUrl}");
         AddLog($"MO2 Path: {_mo2Path}");
+        AddLog($"Profile: {_profileName}");
 
         var nexusBridge = FindNexusBridge();
         if (string.IsNullOrEmpty(nexusBridge))
@@ -104,7 +113,7 @@ public partial class ProgressViewModel : ViewModelBase
         var startInfo = new ProcessStartInfo
         {
             FileName = nexusBridge,
-            Arguments = $"\"{_collectionUrl}\" \"{_mo2Path}\" --yes",
+            Arguments = $"\"{_collectionUrl}\" \"{_mo2Path}\" --yes --profile \"{_profileName}\"",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -191,13 +200,20 @@ public partial class ProgressViewModel : ViewModelBase
             {
                 Phase = "Downloading...";
                 _downloadStartTime = DateTime.Now;
-                _lastSpeedUpdate = DateTime.Now;
+                _speedSamples.Clear();
+                _completedFilesMb = 0;
+                _currentFileTotalMb = 0;
+                _currentFileProgressMb = 0;
                 if (int.TryParse(ExtractNumber(line, "Downloading"), out int count))
                     ToDownload = count;
             }
             else if (line.Contains("] Downloading:") && line.Contains("[") && !line.Contains(" MB ("))
             {
                 // "[X/Y] Downloading: ModName" - a new download started
+                // Add previous file's size to completed total
+                _completedFilesMb += _currentFileTotalMb;
+                _currentFileTotalMb = 0;
+                _currentFileProgressMb = 0;
                 Downloaded++;
                 UpdateProgress();
             }
@@ -210,11 +226,14 @@ public partial class ProgressViewModel : ViewModelBase
                     if (double.TryParse(match.Groups[1].Value, out double current) &&
                         double.TryParse(match.Groups[2].Value, out double total))
                     {
-                        DownloadedMb = current;
-                        if (total > TotalDownloadMb)
-                            TotalDownloadMb = total;
+                        _currentFileProgressMb = current;
+                        _currentFileTotalMb = total;
 
-                        UpdateDownloadSpeed(current);
+                        // Update cumulative progress display
+                        double cumulativeMb = _completedFilesMb + current;
+                        DownloadedMb = cumulativeMb;
+
+                        UpdateDownloadSpeed(cumulativeMb);
                     }
                 }
             }
@@ -293,36 +312,49 @@ public partial class ProgressViewModel : ViewModelBase
     private void UpdateDownloadSpeed(double currentMb)
     {
         var now = DateTime.Now;
-        var elapsed = (now - _lastSpeedUpdate).TotalSeconds;
 
-        if (elapsed >= 1.0) // Update speed every second
+        // Add current sample
+        _speedSamples.Enqueue((now, currentMb));
+
+        // Remove samples older than SpeedWindowSeconds
+        while (_speedSamples.Count > 0 && (now - _speedSamples.Peek().time).TotalSeconds > SpeedWindowSeconds)
         {
-            double mbDelta = currentMb - _lastBytesDownloaded;
-            double speedMbps = mbDelta / elapsed;
+            _speedSamples.Dequeue();
+        }
 
-            if (speedMbps > 0)
+        // Calculate rolling average speed
+        if (_speedSamples.Count >= 2)
+        {
+            var oldest = _speedSamples.Peek();
+            var newest = (now, currentMb);
+            double mbDelta = newest.currentMb - oldest.mb;
+            double secondsDelta = (newest.now - oldest.time).TotalSeconds;
+
+            if (secondsDelta > 0.5) // Need at least 0.5 seconds of data
             {
-                DownloadSpeed = speedMbps >= 1
-                    ? $"{speedMbps:F1} MB/s"
-                    : $"{speedMbps * 1024:F0} KB/s";
+                double speedMbps = mbDelta / secondsDelta;
 
-                // Calculate ETA
-                if (TotalDownloadMb > 0 && currentMb < TotalDownloadMb)
+                if (speedMbps > 0)
                 {
-                    double remaining = TotalDownloadMb - currentMb;
-                    double secondsLeft = remaining / speedMbps;
+                    DownloadSpeed = speedMbps >= 1
+                        ? $"{speedMbps:F1} MB/s"
+                        : $"{speedMbps * 1024:F0} KB/s";
 
-                    if (secondsLeft < 60)
-                        Eta = $"{secondsLeft:F0}s";
-                    else if (secondsLeft < 3600)
-                        Eta = $"{secondsLeft / 60:F0}m {secondsLeft % 60:F0}s";
-                    else
-                        Eta = $"{secondsLeft / 3600:F0}h {(secondsLeft % 3600) / 60:F0}m";
+                    // Calculate ETA based on rolling average speed
+                    if (TotalDownloadMb > 0 && currentMb < TotalDownloadMb)
+                    {
+                        double remaining = TotalDownloadMb - currentMb;
+                        double secondsLeft = remaining / speedMbps;
+
+                        if (secondsLeft < 60)
+                            Eta = $"{secondsLeft:F0}s";
+                        else if (secondsLeft < 3600)
+                            Eta = $"{secondsLeft / 60:F0}m {secondsLeft % 60:F0}s";
+                        else
+                            Eta = $"{secondsLeft / 3600:F0}h {(secondsLeft % 3600) / 60:F0}m";
+                    }
                 }
             }
-
-            _lastBytesDownloaded = currentMb;
-            _lastSpeedUpdate = now;
         }
     }
 
@@ -402,9 +434,30 @@ public partial class ProgressViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void Cancel()
+    {
+        try
+        {
+            _process?.Kill();
+        }
+        catch { }
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            IsRunning = false;
+            Phase = "Cancelled";
+            AddLogDirect("Installation cancelled by user.");
+        });
+    }
+
+    [RelayCommand]
     private void GoBack()
     {
-        _process?.Kill();
+        try
+        {
+            _process?.Kill();
+        }
+        catch { }
         NavigateRequested?.Invoke(this, new NavigationEventArgs(NavigationTarget.MainMenu));
     }
 }

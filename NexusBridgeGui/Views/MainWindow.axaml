@@ -38,6 +38,12 @@
                 <DataTemplate DataType="vm:Mo2SetupViewModel">
                     <views:Mo2SetupView/>
                 </DataTemplate>
+                <DataTemplate DataType="vm:ConfirmViewModel">
+                    <views:ConfirmView/>
+                </DataTemplate>
+                <DataTemplate DataType="vm:NonPremiumDownloadViewModel">
+                    <views:NonPremiumDownloadView/>
+                </DataTemplate>
                 <DataTemplate DataType="vm:AboutViewModel">
                     <views:AboutView/>
                 </DataTemplate>

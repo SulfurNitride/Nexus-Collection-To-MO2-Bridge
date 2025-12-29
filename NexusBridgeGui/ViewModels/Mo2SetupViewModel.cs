@@ -154,7 +154,7 @@ public partial class Mo2SetupViewModel : ViewModelBase
         _settings.ProfileName = ProfileName;
         _settings.Save();
 
-        NavigateRequested?.Invoke(this, new NavigationEventArgs(NavigationTarget.Progress, _collectionUrl));
+        NavigateRequested?.Invoke(this, new NavigationEventArgs(NavigationTarget.Confirm, _collectionUrl));
     }
 
     [RelayCommand]

@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NexusBridgeGui.Services;
@@ -25,6 +27,31 @@ public partial class InstallViewModel : ViewModelBase
         _settings = settings;
         ApiKey = settings.ApiKey;
         UpdateCanProceed();
+    }
+
+    [RelayCommand]
+    private void OpenApiKeyLink()
+    {
+        string url = "https://next.nexusmods.com/settings/api-keys";
+        try
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                Process.Start("xdg-open", url);
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                Process.Start("open", url);
+            }
+        }
+        catch
+        {
+            // Silently fail if browser can't be opened
+        }
     }
 
     partial void OnCollectionUrlChanged(string value) => UpdateCanProceed();

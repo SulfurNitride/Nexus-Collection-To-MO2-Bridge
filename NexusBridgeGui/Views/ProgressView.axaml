@@ -87,7 +87,13 @@
         </Border>
 
         <!-- Buttons -->
-        <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+        <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12" Margin="0,16,0,0">
+            <Button Content="Cancel"
+                    Command="{Binding CancelCommand}"
+                    IsVisible="{Binding IsRunning}"
+                    Background="#ef4444"
+                    Foreground="White"
+                    Padding="24,12"/>
             <Button Content="Back to Menu"
                     Command="{Binding GoBackCommand}"
                     IsEnabled="{Binding !IsRunning}"

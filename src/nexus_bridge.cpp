@@ -241,6 +241,105 @@ struct PluginRule {
 };
 
 // ============================================================================
+// NXM URL Parser (for non-premium downloads)
+// ============================================================================
+
+struct NxmUrl {
+  bool valid = false;
+  std::string game;
+  int modId = -1;
+  int fileId = -1;
+  std::string key;
+  std::string expires;
+  std::string userId;
+
+  // Parse nxm://game/mods/modId/files/fileId?key=xxx&expires=yyy&user_id=zzz
+  static NxmUrl parse(const std::string& url) {
+    NxmUrl result;
+
+    // Check prefix
+    if (url.substr(0, 6) != "nxm://") {
+      return result;
+    }
+
+    std::string rest = url.substr(6);
+
+    // Extract game (before first /)
+    size_t slashPos = rest.find('/');
+    if (slashPos == std::string::npos) return result;
+    result.game = rest.substr(0, slashPos);
+    rest = rest.substr(slashPos + 1);
+
+    // Expect "mods/"
+    if (rest.substr(0, 5) != "mods/") return result;
+    rest = rest.substr(5);
+
+    // Extract modId (before next /)
+    slashPos = rest.find('/');
+    if (slashPos == std::string::npos) return result;
+    try {
+      result.modId = std::stoi(rest.substr(0, slashPos));
+    } catch (...) { return result; }
+    rest = rest.substr(slashPos + 1);
+
+    // Expect "files/"
+    if (rest.substr(0, 6) != "files/") return result;
+    rest = rest.substr(6);
+
+    // Extract fileId (before ? or end)
+    size_t queryPos = rest.find('?');
+    std::string fileIdStr = (queryPos != std::string::npos) ? rest.substr(0, queryPos) : rest;
+    try {
+      result.fileId = std::stoi(fileIdStr);
+    } catch (...) { return result; }
+
+    // Parse query parameters if present
+    if (queryPos != std::string::npos) {
+      std::string query = rest.substr(queryPos + 1);
+
+      // Simple query parser
+      size_t pos = 0;
+      while (pos < query.size()) {
+        size_t eqPos = query.find('=', pos);
+        if (eqPos == std::string::npos) break;
+
+        std::string paramName = query.substr(pos, eqPos - pos);
+        size_t ampPos = query.find('&', eqPos);
+        std::string paramValue = (ampPos != std::string::npos)
+          ? query.substr(eqPos + 1, ampPos - eqPos - 1)
+          : query.substr(eqPos + 1);
+
+        if (paramName == "key") result.key = paramValue;
+        else if (paramName == "expires") result.expires = paramValue;
+        else if (paramName == "user_id") result.userId = paramValue;
+
+        if (ampPos == std::string::npos) break;
+        pos = ampPos + 1;
+      }
+    }
+
+    result.valid = true;
+    return result;
+  }
+
+  // Verify this URL matches expected mod/file
+  bool matches(int expectedModId, int expectedFileId) const {
+    return valid && modId == expectedModId && fileId == expectedFileId;
+  }
+
+  // Check if URL has required key/expires for non-premium download
+  bool hasDownloadKey() const {
+    return !key.empty() && !expires.empty();
+  }
+};
+
+// Generate Nexus website URL for a mod file
+std::string getNexusFileUrl(const std::string& game, int modId, int fileId) {
+  return "https://www.nexusmods.com/" + game + "/mods/" +
+         std::to_string(modId) + "?tab=files&file_id=" + std::to_string(fileId);
+}
+
+// ============================================================================
 // CURL Helpers with Progress
 // ============================================================================
 
@@ -487,6 +586,49 @@ public:
     if (httpCode != 200 || response.empty()) {
       std::cerr << "  Failed to get download link (HTTP " << httpCode << ")"
                 << std::endl;
+      return links;
+    }
+
+    try {
+      json data = json::parse(response);
+      if (data.is_array()) {
+        for (const auto &item : data) {
+          if (item.contains("URI")) {
+            links.push_back(item["URI"].get<std::string>());
+          }
+        }
+      }
+    } catch (const json::exception &e) {
+      std::cerr << "  Failed to parse download links: " << e.what()
+                << std::endl;
+    }
+
+    return links;
+  }
+
+  // Get download links for non-premium users (requires key and expires from nxm:// URL)
+  std::vector<std::string> getDownloadLinksWithKey(int modId, int fileId,
+                                                    const std::string& key,
+                                                    const std::string& expires) {
+    rateLimitWait();
+
+    std::string url = "https://api.nexusmods.com/v1/games/" + gameDomain +
+                      "/mods/" + std::to_string(modId) + "/files/" +
+                      std::to_string(fileId) + "/download_link.json" +
+                      "?key=" + key + "&expires=" + expires;
+
+    long httpCode = 0;
+    std::string response = httpGet(url, apiKey, &httpCode);
+
+    std::vector<std::string> links;
+
+    if (httpCode != 200 || response.empty()) {
+      std::cerr << "  Failed to get download link (HTTP " << httpCode << ")"
+                << std::endl;
+      if (httpCode == 410) {
+        std::cerr << "  Download link expired. Please click 'Download with Manager' again."
+                  << std::endl;
+      }
       return links;
     }
 
@@ -2241,7 +2383,10 @@ void printUsage(const char *progName) {
   std::cout << "  " << progName << " <collection.json> <mo2_path> [options]" << std::endl;
   std::cout << std::endl;
   std::cout << "Options:" << std::endl;
-  std::cout << "  -y, --yes    Continue automatically on download failures" << std::endl;
+  std::cout << "  -y, --yes              Continue automatically on download failures" << std::endl;
+  std::cout << "  --profile <name>       Profile name to create (default: Default)" << std::endl;
+  std::cout << "  --query                Query mode: show download sizes without installing" << std::endl;
+  std::cout << "  --nxm <url>            Download single file using nxm:// URL (non-premium)" << std::endl;
   std::cout << std::endl;
   std::cout << "Arguments:" << std::endl;
   std::cout << "  collection_url    Nexus collection URL" << std::endl;
@@ -2251,7 +2396,7 @@ void printUsage(const char *progName) {
             << std::endl;
   std::cout << std::endl;
   std::cout << "Requirements:" << std::endl;
-  std::cout << "  - Nexus Premium membership (for direct downloads)"
+  std::cout << "  - Nexus Premium or use --nxm for manual downloads"
             << std::endl;
   std::cout << "  - API key in: nexus_apikey.txt" << std::endl;
   std::cout << "  - 7z installed for archive extraction" << std::endl;
@@ -2273,17 +2418,26 @@ int main(int argc, char *argv[]) {
 
   // Parse optional flags
   bool autoYes = false;
+  bool queryMode = false;
+  std::string profileName = "Default";
+  std::string nxmUrl;
   for (int i = 3; i < argc; ++i) {
     std::string arg = argv[i];
     if (arg == "-y" || arg == "--yes") {
       autoYes = true;
+    } else if (arg == "--query") {
+      queryMode = true;
+    } else if (arg == "--profile" && i + 1 < argc) {
+      profileName = argv[++i];
+    } else if (arg == "--nxm" && i + 1 < argc) {
+      nxmUrl = argv[++i];
     }
   }
 
   // Setup paths
   std::string modsDir = mo2Path + "/mods";
   std::string downloadsDir = mo2Path + "/downloads";
-  std::string profilesDir = mo2Path + "/profiles/Default";
+  std::string profilesDir = mo2Path + "/profiles/" + profileName;
   std::string tempDir = mo2Path + "/temp_extract";
 
   fs::create_directories(modsDir);
@@ -2300,6 +2454,77 @@ int main(int argc, char *argv[]) {
                  "https://www.nexusmods.com/users/myaccount?tab=api"
               << std::endl;
     return 1;
+  }
+
+  // Handle --nxm mode: download single file using nxm:// URL
+  if (!nxmUrl.empty()) {
+    NxmUrl nxm = NxmUrl::parse(nxmUrl);
+    if (!nxm.valid) {
+      std::cerr << "Error: Invalid nxm:// URL format" << std::endl;
+      std::cerr << "Expected: nxm://game/mods/modId/files/fileId?key=xxx&expires=yyy" << std::endl;
+      return 1;
+    }
+
+    if (!nxm.hasDownloadKey()) {
+      std::cerr << "Error: nxm:// URL missing key/expires parameters" << std::endl;
+      std::cerr << "Make sure you clicked 'Download with Manager' on Nexus Mods" << std::endl;
+      return 1;
+    }
+
+    std::cout << "NXM_DOWNLOAD_START" << std::endl;
+    std::cout << "Game: " << nxm.game << std::endl;
+    std::cout << "Mod ID: " << nxm.modId << std::endl;
+    std::cout << "File ID: " << nxm.fileId << std::endl;
+
+    // Initialize API with the game from the nxm URL
+    NexusAPI nexus(apiKey, nxm.game);
+
+    // Get file info first
+    json fileInfo = nexus.getFileInfo(nxm.modId, nxm.fileId);
+    std::string filename = fileInfo.value("file_name", "download_" + std::to_string(nxm.fileId) + ".7z");
+    long long fileSize = fileInfo.value("size_in_bytes", 0LL);
+
+    std::cout << "Filename: " << filename << std::endl;
+    if (fileSize > 0) {
+      std::cout << "Size: " << (fileSize / (1024.0 * 1024.0)) << " MB" << std::endl;
+    }
+
+    // Get download link using key/expires
+    std::vector<std::string> links = nexus.getDownloadLinksWithKey(
+        nxm.modId, nxm.fileId, nxm.key, nxm.expires);
+
+    if (links.empty()) {
+      std::cerr << "Error: Failed to get download link" << std::endl;
+      std::cout << "NXM_DOWNLOAD_FAILED" << std::endl;
+      return 1;
+    }
+
+    // Download to mo2 downloads folder
+    std::string destPath = downloadsDir + "/" + filename;
+
+    // Add modId to filename if not already present (for MO2 meta)
+    std::string modIdPattern = "-" + std::to_string(nxm.modId) + "-";
+    if (filename.find(modIdPattern) == std::string::npos) {
+      size_t extPos = filename.rfind('.');
+      if (extPos != std::string::npos) {
+        destPath = downloadsDir + "/" + filename.substr(0, extPos) +
+                   "-" + std::to_string(nxm.modId) + "-" + std::to_string(nxm.fileId) +
+                   filename.substr(extPos);
+      }
+    }
+
+    std::cout << "Downloading to: " << destPath << std::endl;
+
+    bool success = downloadFile(links[0], destPath, filename, fileSize);
+
+    if (success) {
+      std::cout << std::endl << "NXM_DOWNLOAD_COMPLETE" << std::endl;
+      std::cout << "FILE:" << destPath << std::endl;
+      return 0;
+    } else {
+      std::cerr << "NXM_DOWNLOAD_FAILED" << std::endl;
+      return 1;
+    }
   }
 
   // Load collection - either from URL or file
@@ -2355,10 +2580,11 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  if (!nexus.isPremium) {
+  // For non-premium users, block direct downloads but allow query mode and nxm mode
+  if (!nexus.isPremium && !queryMode && nxmUrl.empty()) {
     std::cerr << "ERROR: Nexus Premium is required for direct downloads."
               << std::endl;
-    std::cerr << "Without Premium, the API does not provide download links."
+    std::cerr << "Without Premium, use --query to check collection, then --nxm for manual downloads."
               << std::endl;
     return 1;
   }
@@ -2530,6 +2756,57 @@ int main(int argc, char *argv[]) {
 
   std::cout << "  Found " << modArchivePaths.size() << " existing archives" << std::endl;
   std::cout << "  Need to download " << downloadTasks.size() << " archives" << std::endl;
+
+  // Calculate total download size
+  long long totalDownloadBytes = 0;
+  for (const auto &dt : downloadTasks) {
+    totalDownloadBytes += dt.fileSize;
+  }
+
+  // Calculate estimated install size (roughly 2x download size for compressed archives)
+  long long estimatedInstallBytes = totalDownloadBytes * 2;
+
+  // Format size helper
+  auto formatSize = [](long long bytes) -> std::string {
+    if (bytes >= 1024LL * 1024 * 1024) {
+      return std::to_string(bytes / (1024LL * 1024 * 1024)) + "." +
+             std::to_string((bytes % (1024LL * 1024 * 1024)) * 10 / (1024LL * 1024 * 1024)) + " GB";
+    } else if (bytes >= 1024LL * 1024) {
+      return std::to_string(bytes / (1024LL * 1024)) + "." +
+             std::to_string((bytes % (1024LL * 1024)) * 10 / (1024LL * 1024)) + " MB";
+    } else {
+      return std::to_string(bytes / 1024) + " KB";
+    }
+  };
+
+  std::cout << "  Total download size: " << formatSize(totalDownloadBytes) << std::endl;
+  std::cout << "  Estimated install size: " << formatSize(estimatedInstallBytes) << std::endl;
+
+  // Query mode - output JSON summary and exit
+  if (queryMode) {
+    std::cout << std::endl << "=== QUERY_RESULT ===" << std::endl;
+    std::cout << "TOTAL_MODS:" << collection.mods.size() << std::endl;
+    std::cout << "TO_DOWNLOAD:" << downloadTasks.size() << std::endl;
+    std::cout << "ALREADY_HAVE:" << modArchivePaths.size() << std::endl;
+    std::cout << "SKIPPED:" << skipped << std::endl;
+    std::cout << "DOWNLOAD_BYTES:" << totalDownloadBytes << std::endl;
+    std::cout << "INSTALL_BYTES:" << estimatedInstallBytes << std::endl;
+    std::cout << "COLLECTION_NAME:" << collection.collectionName << std::endl;
+    std::cout << "GAME:" << collection.domainName << std::endl;
+
+    // Output download queue for non-premium mode
+    std::cout << "=== DOWNLOAD_QUEUE ===" << std::endl;
+    for (const auto& dt : downloadTasks) {
+      if (!dt.isDirectDownload && dt.modId > 0 && dt.fileId > 0) {
+        std::cout << "QUEUE_ITEM:" << dt.modId << ":" << dt.fileId << ":"
+                  << dt.fileSize << ":" << dt.modName << std::endl;
+      }
+    }
+    std::cout << "=== END_DOWNLOAD_QUEUE ===" << std::endl;
+
+    std::cout << "=== END_QUERY ===" << std::endl;
+    return 0;
+  }
 
   // Phase 1b: Download missing archives in parallel
   if (!downloadTasks.empty()) {

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
 using NexusBridgeGui.Services;
 
@@ -7,6 +8,8 @@ public partial class MainWindowViewModel : ViewModelBase
 {
     private readonly SettingsService _settings;
     private string _pendingCollectionUrl = "";
+    private string _pendingGame = "";
+    private List<DownloadQueueItem> _pendingDownloadQueue = new();
 
     [ObservableProperty]
     private ViewModelBase _currentView;
@@ -29,11 +32,20 @@ public partial class MainWindowViewModel : ViewModelBase
             _pendingCollectionUrl = e.CollectionUrl;
         }
 
+        // Store download queue when navigating from Confirm to NonPremiumDownload
+        if (sender is ConfirmViewModel confirmVm && e.Target == NavigationTarget.NonPremiumDownload)
+        {
+            _pendingDownloadQueue = new List<DownloadQueueItem>(confirmVm.DownloadQueue);
+            _pendingGame = confirmVm.Game;
+        }
+
         ViewModelBase newView = e.Target switch
         {
             NavigationTarget.MainMenu => CreateMainMenuViewModel(),
             NavigationTarget.Install => CreateInstallViewModel(),
             NavigationTarget.Mo2Setup => CreateMo2SetupViewModel(_pendingCollectionUrl),
+            NavigationTarget.Confirm => CreateConfirmViewModel(_pendingCollectionUrl),
+            NavigationTarget.NonPremiumDownload => CreateNonPremiumDownloadViewModel(_pendingCollectionUrl),
             NavigationTarget.Progress => CreateProgressViewModel(_pendingCollectionUrl),
             NavigationTarget.About => CreateAboutViewModel(),
             _ => CurrentView
@@ -64,9 +76,28 @@ public partial class MainWindowViewModel : ViewModelBase
         return vm;
     }
 
+    private ConfirmViewModel CreateConfirmViewModel(string collectionUrl)
+    {
+        var vm = new ConfirmViewModel(collectionUrl, _settings.Mo2Path, _settings.ProfileName);
+        vm.NavigateRequested += OnNavigateRequested;
+        return vm;
+    }
+
     private ProgressViewModel CreateProgressViewModel(string collectionUrl)
     {
-        var vm = new ProgressViewModel(collectionUrl, _settings.Mo2Path);
+        var vm = new ProgressViewModel(collectionUrl, _settings.Mo2Path, _settings.ProfileName);
+        vm.NavigateRequested += OnNavigateRequested;
+        return vm;
+    }
+
+    private NonPremiumDownloadViewModel CreateNonPremiumDownloadViewModel(string collectionUrl)
+    {
+        var vm = new NonPremiumDownloadViewModel(
+            collectionUrl,
+            _settings.Mo2Path,
+            _settings.ProfileName,
+            _pendingGame,
+            _pendingDownloadQueue);
         vm.NavigateRequested += OnNavigateRequested;
         return vm;
     }
@@ -84,6 +115,8 @@ public enum NavigationTarget
     MainMenu,
     Install,
     Mo2Setup,
+    Confirm,
+    NonPremiumDownload,
     Progress,
     About
 }
