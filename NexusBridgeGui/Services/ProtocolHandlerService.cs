@@ -104,6 +104,16 @@ public static class ProtocolHandlerService
             return (false, $"Executable not found at: {exePath}\n\nTry running from the extracted folder.");
         }
 
+        var desktopFilePath = GetDesktopFilePath();
+
+        // Clean up any existing registration first
+        try
+        {
+            if (File.Exists(desktopFilePath))
+                File.Delete(desktopFilePath);
+        }
+        catch { }
+
         var desktopContent = $@"[Desktop Entry]
 Name=NexusBridge
 Comment=Nexus Mods Collection Installer
@@ -115,7 +125,6 @@ NoDisplay=true
 Categories=Utility;
 ";
 
-        var desktopFilePath = GetDesktopFilePath();
         var directory = Path.GetDirectoryName(desktopFilePath);
 
         try
