@@ -14,7 +14,7 @@ include_directories(${CMAKE_SOURCE_DIR}/include)
 
 # Global definitions for Windows
 if(WIN32)
-    add_compile_definitions(NOMINMAX LOOT_STATIC)
+    add_compile_definitions(NOMINMAX LOOT_STATIC CURL_STATICLIB)
 endif()
 
 # libloot paths
