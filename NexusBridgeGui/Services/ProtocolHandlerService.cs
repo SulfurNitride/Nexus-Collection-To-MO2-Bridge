@@ -148,59 +148,79 @@ Categories=Utility;
             System.Diagnostics.Debug.WriteLine($"xdg-mime failed: {ex.Message}");
         }
 
+        // Try gio mime (more reliable on GNOME-based systems)
+        try
+        {
+            var gioProcess = Process.Start(new ProcessStartInfo
+            {
+                FileName = "gio",
+                Arguments = $"mime x-scheme-handler/{ProtocolScheme} nexusbridge-nxm.desktop",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+            gioProcess?.WaitForExit();
+        }
+        catch { }
+
         // Also directly update mimeapps.list for better compatibility
         try
         {
             var mimeappsPath = GetMimeappsListPath();
             var mimeType = $"x-scheme-handler/{ProtocolScheme}";
-            var lines = new List<string>();
-            bool inDefaultApps = false;
-            bool foundMimeType = false;
+
+            // Read existing content, removing ALL existing nxm entries
+            var sections = new Dictionary<string, List<string>>();
+            string currentSection = "";
 
             if (File.Exists(mimeappsPath))
             {
                 foreach (var line in File.ReadAllLines(mimeappsPath))
                 {
-                    if (line.Trim() == "[Default Applications]")
+                    if (line.StartsWith("[") && line.EndsWith("]"))
                     {
-                        inDefaultApps = true;
-                        lines.Add(line);
+                        currentSection = line;
+                        if (!sections.ContainsKey(currentSection))
+                            sections[currentSection] = new List<string>();
                     }
-                    else if (line.StartsWith("[") && line.EndsWith("]"))
+                    else if (!string.IsNullOrWhiteSpace(line) && !line.StartsWith($"{mimeType}="))
                     {
-                        // New section - if we were in Default Apps and didn't find our entry, add it
-                        if (inDefaultApps && !foundMimeType)
-                        {
-                            lines.Add($"{mimeType}=nexusbridge-nxm.desktop");
-                            foundMimeType = true;
-                        }
-                        inDefaultApps = false;
-                        lines.Add(line);
-                    }
-                    else if (inDefaultApps && line.StartsWith($"{mimeType}="))
-                    {
-                        // Replace existing entry
-                        lines.Add($"{mimeType}=nexusbridge-nxm.desktop");
-                        foundMimeType = true;
-                    }
-                    else
-                    {
-                        lines.Add(line);
+                        // Keep all lines EXCEPT existing nxm handler entries
+                        if (!sections.ContainsKey(currentSection))
+                            sections[currentSection] = new List<string>();
+                        sections[currentSection].Add(line);
                     }
                 }
             }
 
-            // If no Default Applications section or no entry found, add it
-            if (!foundMimeType)
+            // Ensure [Default Applications] section exists and add our entry
+            if (!sections.ContainsKey("[Default Applications]"))
+                sections["[Default Applications]"] = new List<string>();
+
+            // Add our entry at the beginning of Default Applications
+            sections["[Default Applications]"].Insert(0, $"{mimeType}=nexusbridge-nxm.desktop");
+
+            // Write back
+            var output = new List<string>();
+
+            // Write [Default Applications] first (highest priority)
+            if (sections.ContainsKey("[Default Applications]"))
             {
-                if (!lines.Any(l => l.Trim() == "[Default Applications]"))
-                {
-                    lines.Add("[Default Applications]");
-                }
-                lines.Add($"{mimeType}=nexusbridge-nxm.desktop");
+                output.Add("[Default Applications]");
+                output.AddRange(sections["[Default Applications]"]);
+                sections.Remove("[Default Applications]");
             }
 
-            File.WriteAllLines(mimeappsPath, lines);
+            // Write other sections
+            foreach (var section in sections)
+            {
+                if (!string.IsNullOrEmpty(section.Key))
+                {
+                    output.Add(section.Key);
+                    output.AddRange(section.Value);
+                }
+            }
+
+            File.WriteAllLines(mimeappsPath, output);
         }
         catch
         {
