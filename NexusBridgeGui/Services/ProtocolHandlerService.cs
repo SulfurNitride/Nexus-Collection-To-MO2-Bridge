@@ -92,6 +92,74 @@ public static class ProtocolHandlerService
         return Path.Combine(home, ".config", "mimeapps.list");
     }
 
+    private static string GetLocalMimeappsListPath()
+    {
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        return Path.Combine(home, ".local", "share", "applications", "mimeapps.list");
+    }
+
+    private static void UpdateMimeappsList(string mimeappsPath, string mimeType)
+    {
+        // Read existing content, removing ALL existing nxm entries
+        var sections = new Dictionary<string, List<string>>();
+        string currentSection = "";
+
+        if (File.Exists(mimeappsPath))
+        {
+            foreach (var line in File.ReadAllLines(mimeappsPath))
+            {
+                if (line.StartsWith("[") && line.EndsWith("]"))
+                {
+                    currentSection = line;
+                    if (!sections.ContainsKey(currentSection))
+                        sections[currentSection] = new List<string>();
+                }
+                else if (!string.IsNullOrWhiteSpace(line) && !line.StartsWith($"{mimeType}="))
+                {
+                    // Keep all lines EXCEPT existing nxm handler entries
+                    if (!sections.ContainsKey(currentSection))
+                        sections[currentSection] = new List<string>();
+                    sections[currentSection].Add(line);
+                }
+            }
+        }
+
+        // Ensure [Default Applications] section exists and add our entry
+        if (!sections.ContainsKey("[Default Applications]"))
+            sections["[Default Applications]"] = new List<string>();
+
+        // Add our entry at the beginning of Default Applications
+        sections["[Default Applications]"].Insert(0, $"{mimeType}=nexusbridge-nxm.desktop");
+
+        // Write back
+        var output = new List<string>();
+
+        // Write [Default Applications] first (highest priority)
+        if (sections.ContainsKey("[Default Applications]"))
+        {
+            output.Add("[Default Applications]");
+            output.AddRange(sections["[Default Applications]"]);
+            sections.Remove("[Default Applications]");
+        }
+
+        // Write other sections
+        foreach (var section in sections)
+        {
+            if (!string.IsNullOrEmpty(section.Key))
+            {
+                output.Add(section.Key);
+                output.AddRange(section.Value);
+            }
+        }
+
+        // Ensure directory exists
+        var dir = Path.GetDirectoryName(mimeappsPath);
+        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            Directory.CreateDirectory(dir);
+
+        File.WriteAllLines(mimeappsPath, output);
+    }
+
     private static (bool, string) RegisterLinux()
     {
         // Use Environment.ProcessPath for single-file apps (MainModule.FileName returns temp extraction path)
@@ -171,70 +239,22 @@ Categories=Utility;
         }
         catch { }
 
-        // Also directly update mimeapps.list for better compatibility
+        // Update BOTH mimeapps.list locations for maximum compatibility
+        var mimeType = $"x-scheme-handler/{ProtocolScheme}";
+
+        // ~/.config/mimeapps.list (primary location for most desktop environments)
         try
         {
-            var mimeappsPath = GetMimeappsListPath();
-            var mimeType = $"x-scheme-handler/{ProtocolScheme}";
-
-            // Read existing content, removing ALL existing nxm entries
-            var sections = new Dictionary<string, List<string>>();
-            string currentSection = "";
-
-            if (File.Exists(mimeappsPath))
-            {
-                foreach (var line in File.ReadAllLines(mimeappsPath))
-                {
-                    if (line.StartsWith("[") && line.EndsWith("]"))
-                    {
-                        currentSection = line;
-                        if (!sections.ContainsKey(currentSection))
-                            sections[currentSection] = new List<string>();
-                    }
-                    else if (!string.IsNullOrWhiteSpace(line) && !line.StartsWith($"{mimeType}="))
-                    {
-                        // Keep all lines EXCEPT existing nxm handler entries
-                        if (!sections.ContainsKey(currentSection))
-                            sections[currentSection] = new List<string>();
-                        sections[currentSection].Add(line);
-                    }
-                }
-            }
-
-            // Ensure [Default Applications] section exists and add our entry
-            if (!sections.ContainsKey("[Default Applications]"))
-                sections["[Default Applications]"] = new List<string>();
-
-            // Add our entry at the beginning of Default Applications
-            sections["[Default Applications]"].Insert(0, $"{mimeType}=nexusbridge-nxm.desktop");
-
-            // Write back
-            var output = new List<string>();
-
-            // Write [Default Applications] first (highest priority)
-            if (sections.ContainsKey("[Default Applications]"))
-            {
-                output.Add("[Default Applications]");
-                output.AddRange(sections["[Default Applications]"]);
-                sections.Remove("[Default Applications]");
-            }
-
-            // Write other sections
-            foreach (var section in sections)
-            {
-                if (!string.IsNullOrEmpty(section.Key))
-                {
-                    output.Add(section.Key);
-                    output.AddRange(section.Value);
-                }
-            }
-
-            File.WriteAllLines(mimeappsPath, output);
+            UpdateMimeappsList(GetMimeappsListPath(), mimeType);
         }
-        catch
+        catch { }
+
+        // ~/.local/share/applications/mimeapps.list (older location, still used by some apps)
+        try
         {
-            // Fall back to just xdg-mime
+            UpdateMimeappsList(GetLocalMimeappsListPath(), mimeType);
         }
+        catch { }
 
         // Update desktop database
         var updateDb = Process.Start(new ProcessStartInfo
