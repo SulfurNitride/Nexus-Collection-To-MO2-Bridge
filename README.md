@@ -1,22 +1,22 @@
 # Nexus Collection to MO2 Bridge
 
-A lightweight, standalone bridge tool to install Nexus Collections directly into Mod Organizer 2 (MO2), bypassing Vortex completely.
+A lightweight, standalone bridge tool to install Nexus Collections directly into Mod Organizer 2, bypassing Vortex completely.
 
 # [DISCORD](https://discord.gg/9JWQzSeUWt)
 
 # [NEXUS RELEASE](https://www.nexusmods.com/site/mods/1563)
 
 ## Features
-*   **Direct Installation:** Installs collections directly to your MO2 `mods` folder.
-*   **Zero Dependencies:** Bundles everything you need (including 7-Zip and Loot). No need to install Python, Node.js, or other runtimes.
-*   **FOMOD Support:** Automatically handles FOMOD installers with the correct options selected by the collection curator.
-*   **Cross-Platform:** Native support for Windows and Linux.
+*   Direct Install, this is **MEANT** for a clean install of MO2, and only supports Skyrim as of right now! Feel free to test other games but I'm just looking at skyrim.
+*   Everything is already bundled in you need (including 7-Zip and Loot). (Windows users might need VCRUN2022)
+*   Compatibile on both Windows and Linux.
+*   I've tried my best to match the sorting algorithm that Vortex uses, so at least in my testing Plugins.txt is anywhere from a 90-100% match as if vortex did it. But the modlist.txt for mod conflicts is still a WIP!!! This means some things could be messed up!!!!!
+*   [Immersive and Pure](https://www.nexusmods.com/games/skyrimspecialedition/collections/qfftpq) is the collection I was able to install without any issues. If you do have issues with modlists I.E wrong versions of mods installed please let me know either through github issues, or the discord! Please let me know the platform you are on, and what collection you are trying to install.
 
 ## Usage
-1.  **API Key:** On first run, you will be asked for your Nexus Mods API Key (Premium required for automatic downloads).
-2.  **Collection URL:** Paste the link to the Nexus Collection you want to install.
-3.  **Directories:** Select your MO2 instance folder.
-4.  The tool will handle the rest!
+1.  **Collection URL:** Paste the link to the Nexus Collection you want to install.
+2.  **Directories:** Select your MO2 instance folder.
+3.  The tool will handle the rest!
 
 ## Building from Source
 
