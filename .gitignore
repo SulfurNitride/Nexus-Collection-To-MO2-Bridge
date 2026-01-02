@@ -1,0 +1,29 @@
+# Prerequisites
+build/
+.cache/
+target/
+external/libloot/target/
+external/libloot/cpp/build/
+*.o
+*.so
+*.a
+.vscode/
+.idea/
+*.swp
+.DS_Store
+__pycache__/
+
+# Build outputs
+dist/
+publish/
+NexusBridge-Windows-x64/
+NexusBridge-Windows-x64.zip
+
+# Bundled 7z (downloaded during build)
+7z.exe
+7z.dll
+7za.exe
+
+# .NET
+NexusBridgeGui/bin/
+NexusBridgeGui/obj/

@@ -1,0 +1,60 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NexusBridgeGui.ViewModels"
+             x:Class="NexusBridgeGui.Views.InstallView"
+             x:DataType="vm:InstallViewModel">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+        <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,20">
+            <TextBlock Text="Install Collection" FontSize="20" FontWeight="Bold"/>
+            <TextBlock Text="Step 1 of 2" Foreground="Gray" FontSize="12"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Spacing="20">
+            <!-- Collection URL -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Collection URL or Path" FontWeight="SemiBold"/>
+                <TextBox Text="{Binding CollectionUrl}"
+                         Watermark="https://www.nexusmods.com/skyrimspecialedition/collections/..."
+                         Padding="12,8"/>
+                <TextBlock Text="Enter a Nexus collection URL or path to a collection.json file"
+                           Foreground="Gray" FontSize="12"/>
+            </StackPanel>
+
+            <!-- API Key -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Nexus API Key" FontWeight="SemiBold"/>
+                <TextBox Text="{Binding ApiKey}"
+                         Watermark="Enter your Nexus API Key..."
+                         PasswordChar="*"
+                         Padding="12,8"/>
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBlock Text="Get your API key from:" Foreground="Gray" FontSize="12" VerticalAlignment="Center"/>
+                    <Button Command="{Binding OpenApiKeyLinkCommand}"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Padding="0"
+                            Cursor="Hand">
+                        <TextBlock Text="https://next.nexusmods.com/settings/api-keys"
+                                   Foreground="#00d4ff"
+                                   FontSize="12"
+                                   TextDecorations="Underline"/>
+                    </Button>
+                </StackPanel>
+                <TextBlock Text="(Scroll to bottom of page for Personal API Key)"
+                           Foreground="Gray" FontSize="12"/>
+            </StackPanel>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Content="Back"
+                    Command="{Binding GoBackCommand}"
+                    Padding="24,12"/>
+            <Button Content="Next"
+                    Command="{Binding NextCommand}"
+                    IsEnabled="{Binding CanProceed}"
+                    Classes="accent"
+                    Padding="24,12"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

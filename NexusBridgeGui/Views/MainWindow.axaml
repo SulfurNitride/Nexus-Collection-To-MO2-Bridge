@@ -1,0 +1,53 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:NexusBridgeGui.ViewModels"
+        xmlns:views="using:NexusBridgeGui.Views"
+        x:Class="NexusBridgeGui.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="NexusBridge - Collection Installer"
+        Width="800" Height="600"
+        MinWidth="600" MinHeight="450"
+        WindowStartupLocation="CenterScreen">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <Grid RowDefinitions="Auto,*">
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#1a1a2e" Padding="16">
+            <TextBlock Text="NexusBridge - Collection Installer"
+                       FontSize="24"
+                       FontWeight="Bold"
+                       Foreground="#00d4ff"
+                       HorizontalAlignment="Center"/>
+        </Border>
+
+        <!-- Content Area -->
+        <ContentControl Grid.Row="1" Content="{Binding CurrentView}" Margin="16">
+            <ContentControl.DataTemplates>
+                <DataTemplate DataType="vm:MainMenuViewModel">
+                    <views:MainMenuView/>
+                </DataTemplate>
+                <DataTemplate DataType="vm:InstallViewModel">
+                    <views:InstallView/>
+                </DataTemplate>
+                <DataTemplate DataType="vm:ProgressViewModel">
+                    <views:ProgressView/>
+                </DataTemplate>
+                <DataTemplate DataType="vm:Mo2SetupViewModel">
+                    <views:Mo2SetupView/>
+                </DataTemplate>
+                <DataTemplate DataType="vm:ConfirmViewModel">
+                    <views:ConfirmView/>
+                </DataTemplate>
+                <DataTemplate DataType="vm:NonPremiumDownloadViewModel">
+                    <views:NonPremiumDownloadView/>
+                </DataTemplate>
+                <DataTemplate DataType="vm:AboutViewModel">
+                    <views:AboutView/>
+                </DataTemplate>
+            </ContentControl.DataTemplates>
+        </ContentControl>
+    </Grid>
+</Window>

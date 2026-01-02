@@ -1,0 +1,137 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NexusBridgeGui.ViewModels"
+             x:Class="NexusBridgeGui.Views.ConfirmView"
+             x:DataType="vm:ConfirmViewModel">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+        <TextBlock Grid.Row="0" Text="Confirm Installation" FontSize="20" FontWeight="Bold" Margin="0,0,0,16"/>
+
+        <!-- Loading -->
+        <StackPanel Grid.Row="1" IsVisible="{Binding IsLoading}" VerticalAlignment="Center" HorizontalAlignment="Center">
+            <TextBlock Text="Querying collection..." FontSize="16" HorizontalAlignment="Center"/>
+            <ProgressBar IsIndeterminate="True" Width="200" Margin="0,16,0,0"/>
+        </StackPanel>
+
+        <!-- Error -->
+        <StackPanel Grid.Row="1" IsVisible="{Binding HasError}" VerticalAlignment="Center">
+            <TextBlock Text="Error" FontSize="18" FontWeight="Bold" Foreground="#ef4444" Margin="0,0,0,8"/>
+            <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" Foreground="#fca5a5"/>
+        </StackPanel>
+
+        <!-- Collection Info -->
+        <StackPanel Grid.Row="1" IsVisible="{Binding !IsLoading}" Spacing="16">
+            <StackPanel IsVisible="{Binding !HasError}">
+                <!-- Collection Name -->
+                <Border Background="#1e293b" CornerRadius="8" Padding="16" Margin="0,0,0,16">
+                    <StackPanel>
+                        <TextBlock Text="{Binding CollectionName}" FontSize="18" FontWeight="Bold" Foreground="#00d4ff"/>
+                        <TextBlock Text="{Binding Game}" Foreground="Gray" Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Stats Grid -->
+                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto" Margin="0,0,0,16">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Total Mods:" FontWeight="Bold" Margin="0,4"/>
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding TotalMods}" Margin="0,4"/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Need to Download:" FontWeight="Bold" Margin="0,4"/>
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ToDownload}" Foreground="#3b82f6" Margin="0,4"/>
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Already Downloaded:" FontWeight="Bold" Margin="0,4"/>
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding AlreadyHave}" Foreground="#22c55e" Margin="0,4"/>
+
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Skipped (no file info):" FontWeight="Bold" Margin="0,4"/>
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Skipped}" Foreground="#f59e0b" Margin="0,4"/>
+                </Grid>
+
+                <!-- Size Estimates -->
+                <Border Background="#1e293b" CornerRadius="8" Padding="16">
+                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Download Size:" FontWeight="Bold" Margin="0,4"/>
+                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding DownloadSize}" Foreground="#3b82f6" FontWeight="SemiBold" Margin="0,4"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Estimated Install Size:" FontWeight="Bold" Margin="0,4"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding InstallSize}" Foreground="#22c55e" FontWeight="SemiBold" Margin="0,4"/>
+                    </Grid>
+                </Border>
+
+                <!-- Warning -->
+                <Border Background="#422006" CornerRadius="4" Padding="12" Margin="0,16,0,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="!" FontWeight="Bold" Foreground="#f59e0b"/>
+                        <TextBlock Text="This will create a new MO2 profile. Make sure you have enough disk space." Foreground="#fcd34d" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Windows Long Path Warning -->
+                <Border Background="#7f1d1d" CornerRadius="4" Padding="12" Margin="0,8,0,0" IsVisible="{Binding ShowLongPathWarning}">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="!" FontWeight="Bold" Foreground="#ef4444"/>
+                            <TextBlock Text="{Binding LongPathStatus}" Foreground="#fca5a5" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <Button Content="Enable Long Path Support"
+                                Command="{Binding EnableLongPathsCommand}"
+                                IsEnabled="{Binding !IsEnablingLongPath}"
+                                Background="#dc2626"
+                                Foreground="White"
+                                Padding="12,8"
+                                HorizontalAlignment="Left"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Premium status and download mode info -->
+                <Border CornerRadius="4" Padding="12" Margin="0,8,0,0">
+                    <Border.Background>
+                        <SolidColorBrush Color="#1e3a5f"/>
+                    </Border.Background>
+                    <StackPanel Spacing="4">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Account Status:" Foreground="Gray"/>
+                            <TextBlock Text="Premium" Foreground="#22c55e" FontWeight="Bold" IsVisible="{Binding IsPremium}"/>
+                            <TextBlock Text="Free" Foreground="#f59e0b" FontWeight="Bold" IsVisible="{Binding !IsPremium}"/>
+                        </StackPanel>
+                        <TextBlock Text="Free accounts require manual download via browser for each mod."
+                                   Foreground="#94a3b8"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   IsVisible="{Binding !IsPremium}"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Buttons - only show after loading completes -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12" Margin="0,16,0,0"
+                    IsVisible="{Binding !IsLoading}">
+            <Button Content="Back"
+                    Command="{Binding GoBackCommand}"
+                    Padding="24,12"/>
+            <!-- Premium: Direct download -->
+            <Button Content="Start Installation"
+                    Command="{Binding ConfirmCommand}"
+                    IsEnabled="{Binding !HasError}"
+                    IsVisible="{Binding IsPremium}"
+                    Background="#22c55e"
+                    Foreground="White"
+                    Padding="24,12"/>
+            <!-- Non-Premium with downloads needed: Manual download flow -->
+            <Button Content="Download (Manual)"
+                    Command="{Binding StartNonPremiumDownloadCommand}"
+                    IsEnabled="{Binding !HasError}"
+                    IsVisible="{Binding ShowNonPremiumDownload}"
+                    Background="#3b82f6"
+                    Foreground="White"
+                    Padding="24,12"/>
+            <!-- Non-Premium with no downloads: Skip to install -->
+            <Button Content="Continue to Install"
+                    Command="{Binding ConfirmCommand}"
+                    IsEnabled="{Binding !HasError}"
+                    IsVisible="{Binding ShowNonPremiumContinue}"
+                    Background="#22c55e"
+                    Foreground="White"
+                    Padding="24,12"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

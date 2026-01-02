@@ -1,0 +1,57 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NexusBridgeGui.ViewModels"
+             x:Class="NexusBridgeGui.Views.AboutView"
+             x:DataType="vm:AboutViewModel">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+        <TextBlock Grid.Row="0" Text="About NexusBridge" FontSize="20" FontWeight="Bold" Margin="0,0,0,24"/>
+
+        <StackPanel Grid.Row="1" Spacing="16">
+            <StackPanel Spacing="4">
+                <TextBlock Text="{Binding Version, StringFormat='NexusBridge v{0}'}" FontSize="18" FontWeight="Bold"/>
+                <TextBlock Text="Install Nexus Collections directly to Mod Organizer 2"/>
+            </StackPanel>
+
+            <StackPanel Spacing="8" Margin="0,16,0,0">
+                <TextBlock Text="Features:" FontWeight="SemiBold"/>
+                <TextBlock Text="  - Direct CDN downloads (Premium required)"/>
+                <TextBlock Text="  - Manual downloads for non-premium users"/>
+                <TextBlock Text="  - Automatic FOMOD installation"/>
+                <TextBlock Text="  - LOOT-based plugin sorting"/>
+                <TextBlock Text="  - Mod rule enforcement"/>
+                <TextBlock Text="  - Parallel downloads &amp; installs"/>
+            </StackPanel>
+
+            <!-- Protocol Handler Registration -->
+            <Border Background="#1e293b" CornerRadius="8" Padding="16" Margin="0,24,0,0">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="nxm:// Protocol Handler" FontWeight="SemiBold"/>
+                    <TextBlock Text="{Binding ProtocolStatusMessage}" Foreground="#94a3b8" TextWrapping="Wrap"/>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button Content="Register"
+                                Command="{Binding RegisterProtocolHandlerCommand}"
+                                IsVisible="{Binding ShowRegistrationPrompt}"
+                                Background="#3b82f6"
+                                Foreground="White"
+                                Padding="16,8"/>
+                        <Button Content="Unregister"
+                                Command="{Binding UnregisterProtocolHandlerCommand}"
+                                IsVisible="{Binding IsProtocolHandlerRegistered}"
+                                Background="#ef4444"
+                                Foreground="White"
+                                Padding="16,8"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="Cross-platform: Windows &amp; Linux" Foreground="Gray" Margin="0,16,0,0"/>
+        </StackPanel>
+
+        <Button Grid.Row="2"
+                Content="Back"
+                Command="{Binding GoBackCommand}"
+                HorizontalAlignment="Right"
+                Padding="24,12"/>
+    </Grid>
+</UserControl>

@@ -1,0 +1,182 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libcurl4-openssl-dev libpugixml-dev cmake build-essential
+
+    - name: Install Rust (for libloot)
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Build libloot
+      run: |
+        cd external/libloot
+        cargo build --release -p libloot -p libloot-cpp
+        # Debug: Find cxx.cc
+        find target -name "cxx.cc"
+
+    - name: Build NexusBridge CLI
+      run: |
+        mkdir build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=Release ..
+        make NexusBridge
+
+    - name: Build NexusBridgeGui
+      run: |
+        cd NexusBridgeGui
+        dotnet publish -c Release -r linux-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o ../publish/linux
+
+    - name: Download 7-Zip (Linux)
+      run: |
+        wget https://www.7-zip.org/a/7z2408-linux-x64.tar.xz
+        tar -xf 7z2408-linux-x64.tar.xz 7zzs
+        chmod +x 7zzs
+
+    - name: Package Linux
+      run: |
+        mkdir dist
+        cp build/NexusBridge dist/
+        cp publish/linux/NexusBridgeGui dist/
+        # Find and copy libloot - preserve original name and create symlink for compatibility
+        LOOT_LIB=$(find external/libloot/target/release -name "lib*loot.so" | head -1)
+        if [ -n "$LOOT_LIB" ]; then
+          LOOT_NAME=$(basename "$LOOT_LIB")
+          cp "$LOOT_LIB" "dist/$LOOT_NAME"
+          # Create symlinks for both possible names
+          cd dist
+          [ "$LOOT_NAME" != "libloot.so" ] && ln -sf "$LOOT_NAME" libloot.so
+          [ "$LOOT_NAME" != "liblibloot.so" ] && ln -sf "$LOOT_NAME" liblibloot.so
+          cd ..
+        fi
+        cp 7zzs dist/
+        tar -czf NexusBridge-Linux-x64.tar.gz -C dist .
+
+    - name: Upload Linux Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-build
+        path: NexusBridge-Linux-x64.tar.gz
+
+  build-windows:
+    runs-on: windows-2022
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install Rust (for libloot)
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Install Dependencies (vcpkg - static)
+      run: |
+        vcpkg install curl:x64-windows-static
+        vcpkg install pugixml:x64-windows-static
+        vcpkg integrate install
+
+    - name: Build libloot
+      run: |
+        cd external/libloot
+        cargo build --release -p libloot -p libloot-cpp
+        # Result is in target/release/loot.dll (libloot creates loot.dll on Windows usually)
+
+    - name: Build NexusBridge CLI
+      run: |
+        mkdir build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=Release -DVCPKG_TARGET_TRIPLET=x64-windows-static -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake ..
+        cmake --build . --config Release --target NexusBridge
+
+    - name: Build NexusBridgeGui
+      run: |
+        cd NexusBridgeGui
+        dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o ../publish/windows
+
+    - name: Download 7-Zip (Windows)
+      run: |
+        Invoke-WebRequest -Uri "https://www.7-zip.org/a/7z2408-extra.7z" -OutFile "7z-extra.7z"
+        7z x 7z-extra.7z -o7zip_extra
+        Copy-Item "7zip_extra/7za.exe" .
+
+    - name: Package Windows
+      run: |
+        mkdir dist
+        copy build\Release\NexusBridge.exe dist\
+        copy publish\windows\NexusBridgeGui.exe dist\
+
+        # Find loot.dll recursively (this is the Rust dynamic library)
+        $loot = Get-ChildItem -Path external\libloot\target -Recurse -Include "loot.dll","libloot.dll" | Select-Object -First 1
+        if ($loot) {
+            Write-Host "Found libloot: $($loot.FullName)"
+            copy $loot.FullName dist\libloot.dll
+        } else {
+            Write-Error "Could not find loot.dll or libloot.dll"
+        }
+
+        # Static linking used - no need to copy curl/zlib DLLs
+
+        copy 7za.exe dist\
+
+    - name: Create Zip
+      run: |
+        Compress-Archive -Path dist/* -DestinationPath NexusBridge-Windows-x64.zip
+
+    - name: Upload Windows Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-build
+        path: NexusBridge-Windows-x64.zip
+
+  release:
+    needs: [build-linux, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        name: linux-build
+        path: .
+
+    - uses: actions/download-artifact@v4
+      with:
+        name: windows-build
+        path: .
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          NexusBridge-Linux-x64.tar.gz
+          NexusBridge-Windows-x64.zip
