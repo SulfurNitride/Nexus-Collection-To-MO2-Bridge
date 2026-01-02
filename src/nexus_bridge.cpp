@@ -2056,13 +2056,13 @@ public:
     // Count remaining violations (only direct constraints)
     std::map<int, int> finalPosition;
     for (size_t i = 0; i < finalIndices.size(); ++i) {
-      finalPosition[finalIndices[i]] = i;
+      finalPosition[finalIndices[i]] = static_cast<int>(i);
     }
 
     int violations = 0;
     for (size_t i = 0; i < n; ++i) {
       for (int pred : predecessors[i]) {
-        if (finalPosition[pred] > finalPosition[i]) {
+        if (finalPosition[pred] > finalPosition[static_cast<int>(i)]) {
           violations++;
         }
       }
@@ -2801,7 +2801,7 @@ int main(int argc, char *argv[]) {
 
       // Run regedit to import the file (will trigger UAC prompt)
       std::string cmd = "regedit /s \"" + regFilePath + "\"";
-      int result = system(cmd.c_str());
+      (void)system(cmd.c_str());
 
       // Clean up
       try { fs::remove(regFilePath); } catch (...) {}

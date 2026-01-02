@@ -458,17 +458,17 @@ bool process(const std::string& sourceRoot, const std::string& destRoot,
     pugi::xml_document doc;
 
     // Read file as binary first to detect encoding
-    std::ifstream file(xmlPath, std::ios::binary | std::ios::ate);
-    if (!file) {
+    std::ifstream inputFile(xmlPath, std::ios::binary | std::ios::ate);
+    if (!inputFile) {
         std::cerr << "  [ERROR] Failed to open XML file: " << xmlPath << std::endl;
         return false;
     }
 
-    auto size = file.tellg();
-    file.seekg(0, std::ios::beg);
+    auto size = inputFile.tellg();
+    inputFile.seekg(0, std::ios::beg);
     std::vector<char> buffer(size);
-    file.read(buffer.data(), size);
-    file.close();
+    inputFile.read(buffer.data(), size);
+    inputFile.close();
 
     // Detect encoding from BOM
     pugi::xml_encoding encoding = pugi::encoding_auto;
