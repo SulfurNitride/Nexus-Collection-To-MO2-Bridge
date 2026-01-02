@@ -42,3 +42,5 @@ If you want to build the tool yourself instead of using the pre-compiled release
     cmake ..
     cmake --build . --config Release
     ```
+
+    Gen'd with support and help with Claude Code. I will eventually be rewritting this in Rust, and try to make it all by myself at some point if possible. If you want to follow my progress of me learning rust I just started [here.](https://www.youtube.com/watch?v=IqGkaZvdcjk&list=PLB52iltb95qIMAQNma2nHP7Og9c9mqAXl&pp=gAQB)
