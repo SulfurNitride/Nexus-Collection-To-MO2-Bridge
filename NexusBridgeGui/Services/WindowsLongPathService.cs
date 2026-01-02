@@ -2,8 +2,12 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace NexusBridgeGui.Services;
+
+// Suppress CA1416 - the code has runtime guards for platform-specific calls
+#pragma warning disable CA1416
 
 public static class WindowsLongPathService
 {
@@ -99,3 +103,5 @@ public static class WindowsLongPathService
         }
     }
 }
+
+#pragma warning restore CA1416

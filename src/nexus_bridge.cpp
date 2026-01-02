@@ -34,7 +34,9 @@
 #include <vector>
 
 #ifdef _WIN32
-  #define NOMINMAX
+  #ifndef NOMINMAX
+    #define NOMINMAX
+  #endif
   #include <windows.h>
 
 // Check if Windows Long Path support is enabled
@@ -218,14 +220,14 @@ std::string get7zCommand() {
   if (fs::exists(bundledPath)) {
     // Ensure it's executable on Linux
     std::string chmod = "chmod +x " + bundledPath.string();
-    std::system(chmod.c_str());
+    (void)std::system(chmod.c_str());
     return bundledPath.string();
   }
 
   // Fallback: check current directory
   if (fs::exists(exeName)) {
     std::string chmod = "chmod +x ./" + exeName;
-    std::system(chmod.c_str());
+    (void)std::system(chmod.c_str());
     return "./" + exeName;
   }
 
@@ -1600,7 +1602,7 @@ public:
       // Use logicalFilename as the key (it's what rules reference and is unique)
       // Fall back to name if logicalFilename is empty
       std::string key = mods[i].logicalFilename.empty() ? mods[i].name : mods[i].logicalFilename;
-      logicalNameToIdx[key] = i;
+      logicalNameToIdx[key] = static_cast<int>(i);
 
       // Store folderName for output (unique identifier for modlist.txt)
       // Fall back to name if folderName not set
@@ -1718,7 +1720,7 @@ public:
     std::vector<int> sinks;
     for (size_t i = 0; i < mods.size(); ++i) {
       if (successors[i].empty()) {
-        sinks.push_back(i);
+        sinks.push_back(static_cast<int>(i));
       }
     }
 
@@ -1739,7 +1741,7 @@ public:
     std::vector<int> remaining;
     for (size_t i = 0; i < mods.size(); ++i) {
       if (visited[i] == 0) {
-        remaining.push_back(i);
+        remaining.push_back(static_cast<int>(i));
       }
     }
     std::sort(remaining.begin(), remaining.end(), [&modFolders](int a, int b) {
@@ -1796,7 +1798,7 @@ public:
       std::string pluginLower = sortedPlugins[i];
       std::transform(pluginLower.begin(), pluginLower.end(), pluginLower.begin(),
                      [](unsigned char c) { return std::tolower(c); });
-      pluginPosition[pluginLower] = i;
+      pluginPosition[pluginLower] = static_cast<int>(i);
     }
     return pluginPosition;
   }
@@ -1842,7 +1844,7 @@ public:
 
     std::vector<int> inDegree(n, 0);
     for (size_t i = 0; i < n; ++i) {
-      inDegree[i] = predecessors[i].size();
+      inDegree[i] = static_cast<int>(predecessors[i].size());
     }
 
     // Priority queue: sort by tieBreaker (lower = higher priority to process first)
@@ -1851,7 +1853,7 @@ public:
 
     for (size_t i = 0; i < n; ++i) {
       if (inDegree[i] == 0) {
-        ready.push(i);
+        ready.push(static_cast<int>(i));
       }
     }
 
@@ -1878,7 +1880,7 @@ public:
 
       std::vector<int> remaining;
       for (size_t i = 0; i < n; ++i) {
-        if (!added[i]) remaining.push_back(i);
+        if (!added[i]) remaining.push_back(static_cast<int>(i));
       }
       // Sort remaining by tieBreaker
       std::sort(remaining.begin(), remaining.end(),
@@ -1912,7 +1914,7 @@ public:
 
     for (size_t i = 0; i < n; ++i) {
       std::string key = mods[i].logicalFilename.empty() ? mods[i].name : mods[i].logicalFilename;
-      logicalNameToIdx[key] = i;
+      logicalNameToIdx[key] = static_cast<int>(i);
       std::string folder = mods[i].folderName.empty() ? mods[i].name : mods[i].folderName;
       modFolders.push_back(folder);
       if (!mods[i].md5.empty()) {
@@ -1979,7 +1981,7 @@ public:
     std::vector<std::string> dfsOrder = generateModOrder(mods, rules);  // Returns folder names
     std::map<std::string, int> dfsPosition;
     for (size_t i = 0; i < dfsOrder.size(); ++i) {
-      dfsPosition[dfsOrder[i]] = i;
+      dfsPosition[dfsOrder[i]] = static_cast<int>(i);
     }
     std::vector<int> dfsRank(n);
     for (size_t i = 0; i < n; ++i) {
@@ -1993,7 +1995,7 @@ public:
     std::vector<int> kahnIndices = kahnSort(n, successors, predecessors, modPluginPos);
     std::vector<int> kahnRank(n);
     for (size_t i = 0; i < kahnIndices.size(); ++i) {
-      kahnRank[kahnIndices[i]] = i;
+      kahnRank[kahnIndices[i]] = static_cast<int>(i);
     }
 
     // =========================================================================
@@ -2005,7 +2007,7 @@ public:
                      [&](int a, int b) { return modPluginPos[a] < modPluginPos[b]; });
     std::vector<int> pluginRank(n);
     for (size_t i = 0; i < pluginIndices.size(); ++i) {
-      pluginRank[pluginIndices[i]] = i;
+      pluginRank[pluginIndices[i]] = static_cast<int>(i);
     }
 
     // =========================================================================
@@ -2044,7 +2046,7 @@ public:
       std::stable_sort(sortedByScore.begin(), sortedByScore.end(),
                        [&](int a, int b) { return combinedScore[a] < combinedScore[b]; });
       for (size_t i = 0; i < sortedByScore.size(); ++i) {
-        combinedRank[sortedByScore[i]] = i;
+        combinedRank[sortedByScore[i]] = static_cast<int>(i);
       }
     }
 

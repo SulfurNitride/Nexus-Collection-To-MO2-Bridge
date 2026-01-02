@@ -552,7 +552,7 @@ bool process(const std::string& sourceRoot, const std::string& destRoot,
 
                 int pluginIndex = 0;
                 int pluginCount = 0;
-                for (pugi::xml_node p : plugins.children("plugin")) pluginCount++;
+                for (auto _ : plugins.children("plugin")) { (void)_; pluginCount++; }
 
                 for (pugi::xml_node plugin : plugins.children("plugin")) {
                     std::string pluginName = plugin.attribute("name").as_string();
