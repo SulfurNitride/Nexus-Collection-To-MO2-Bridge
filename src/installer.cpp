@@ -10,19 +10,23 @@ class Installer {
 public:
     static std::string get7zCommand() {
         #ifdef _WIN32
-            const std::string bundled = "7za.exe";
+            // Prefer full 7z.exe (has RAR support via 7z.dll)
+            if (fs::exists("7z.exe")) {
+                return "7z.exe";
+            }
+            // Fallback to 7za.exe (standalone, no RAR)
+            if (fs::exists("7za.exe")) {
+                return "7za.exe";
+            }
         #else
             const std::string bundled = "./7zzs";
-        #endif
-
-        if (fs::exists(bundled)) {
-            #ifndef _WIN32
+            if (fs::exists(bundled)) {
                 // Ensure it's executable on Linux
                 std::string chmod = "chmod +x " + bundled;
                 (void)std::system(chmod.c_str());
-            #endif
-            return bundled;
-        }
+                return bundled;
+            }
+        #endif
         return "7z"; // Fallback to global
     }
 

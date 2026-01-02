@@ -126,9 +126,13 @@ jobs:
 
     - name: Download 7-Zip (Windows)
       run: |
-        Invoke-WebRequest -Uri "https://www.7-zip.org/a/7z2408-extra.7z" -OutFile "7z-extra.7z"
-        7z x 7z-extra.7z -o7zip_extra
-        Copy-Item "7zip_extra/7za.exe" .
+        # Download full 7-Zip installer to get 7z.exe + 7z.dll (needed for RAR support)
+        Invoke-WebRequest -Uri "https://www.7-zip.org/a/7z2408-x64.exe" -OutFile "7z-installer.exe"
+        # Extract the installer (it's a 7z self-extracting archive)
+        7z x 7z-installer.exe -o7zip_full
+        # Copy 7z.exe and 7z.dll
+        Copy-Item "7zip_full/7z.exe" .
+        Copy-Item "7zip_full/7z.dll" .
 
     - name: Package Windows
       run: |
@@ -147,7 +151,9 @@ jobs:
 
         # Static linking used - no need to copy curl/zlib DLLs
 
-        copy 7za.exe dist\
+        # Copy full 7z with DLL (needed for RAR support)
+        copy 7z.exe dist\
+        copy 7z.dll dist\
 
     - name: Create Zip
       run: |
